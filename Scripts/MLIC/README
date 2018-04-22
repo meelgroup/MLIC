@@ -1,0 +1,2 @@
+MLIC.py requires pbencoder and maxhs installed and the PATH variable should be pointing to them.
+Issue MLIC.py to see usage.

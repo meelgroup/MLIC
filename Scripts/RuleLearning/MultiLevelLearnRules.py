@@ -160,13 +160,13 @@ def GeneratePositiveConstraints(tempPBFile, tempOutFile, xSize, topWeight, AMatr
             clause += "+1 x"+str(i*xSize+j+1)+" "
         clause += " >= "+str(kValue)+ ";\n"
         opbClauses += str(noise)+':'+clause
-        #f = open(tempPBFile,'w')
-        #f.write("* #variable= "+str(xSize)+" #constraint= 1\n*\n")
-        #f.write(clause)
-        #f.close()
+        f = open(tempPBFile,'w')
+        f.write("* #variable= "+str(xSize)+" #constraint= 1\n*\n")
+        f.write(clause)
+        f.close()
         cmd = "pbencoder "+tempPBFile+" -auxVar="+str(auxVariableStart)+"  > "+str(tempOutFile)
-        #os.system(cmd)
-        #(addedNewClauses, addedNumClauses, auxVariableStart) =  ExtractClausesFromCNFFile(tempOutFile,topWeight,noise, auxVariableStart)
+        os.system(cmd)
+        (addedNewClauses, addedNumClauses, auxVariableStart) =  ExtractClausesFromCNFFile(tempOutFile,topWeight,noise, auxVariableStart)
         cnfClauses += addedNewClauses
         numClauses += addedNumClauses
     return (cnfClauses,numClauses,auxVariableStart,opbClauses)
@@ -250,18 +250,18 @@ def GenerateNegativeConstraints(tempPBFile, tempOutFile, xSize, topWeight, AMatr
                 maxVarIndex = groupNoiseVar
             clause += "~x"+str(groupNoiseVar)+" "
             groupClause += " ~x"+str(j+1)+" "
-    #kValue = rowLen-mValue+1
+    kValue = rowLen-mValue+1
     clause += groupClause
-    clause += " < "+str(mValue)+";\n"
-    #clause += " >= "+str(kValue)+ ";\n"
-    opbClauses += str(noise)+':'+clause
-    #f = open(tempPBFile,'w')
-    #f.write("* #variable= "+str(maxVarIndex)+" #constraint= 1\n*\n")
-    #f.write(clause)
-    #f.close()
-    #cmd = "pbencoder "+tempPBFile+" -auxVar="+str(auxVariableStart)+"  > "+str(tempOutFile)
-    #os.system(cmd)
-    #(addedClauses, addedNumClauses, auxVariableStart) = ExtractClausesFromCNFFile(tempOutFile,topWeight,noise, auxVariableStart)
+    #clause += " < "+str(mValue)+";\n"
+    clause += " >= "+str(kValue)+ ";\n"
+    #opbClauses += str(noise)+':'+clause
+    f = open(tempPBFile,'w')
+    f.write("* #variable= "+str(maxVarIndex)+" #constraint= 1\n*\n")
+    f.write(clause)
+    f.close()
+    cmd = "pbencoder "+tempPBFile+" -auxVar="+str(auxVariableStart)+"  > "+str(tempOutFile)
+    os.system(cmd)
+    (addedClauses, addedNumClauses, auxVariableStart) = ExtractClausesFromCNFFile(tempOutFile,topWeight,noise, auxVariableStart)
     return (addedClauses, addedNumClauses, auxVariableStart, groupRowNoise, opbClauses)
 def GenerateWCNFFileForPB(AMatrix,yVector, alpha, beta, gamma, mValue,xSize,wCNFFileName,groupList,
             groupMap,groupNoiseFlag,level,runIndex,assignList):
@@ -301,7 +301,7 @@ def GenerateWCNFFileForPB(AMatrix,yVector, alpha, beta, gamma, mValue,xSize,wCNF
         else:
             if (i not in groupRowNoise):
                 groupRowNoise[i] = {}
-            if (False and mValue==1):
+            if (True and mValue==1):
                 (addedClauses,addedNumClauses,auxVariableStart, groupRowNoise) = DirectlyGenerateNegativeConstraints(tempPBFile, tempOutFile, xSize,topWeight,
                     AMatrix, i, matrixTrue, mValue, noise, groupRowNoise, groupMap, groupNoiseFlag, auxVariableStart, level)
             else:
@@ -443,7 +443,7 @@ def LearnRules(datafile,mValue,alpha,beta, gamma, timeoutSec, rule_type, level, 
     print("Cost of the best rule:"+str(alpha*len(TrueErrors)+beta*len(TrueRules)))
     print("The number of True Rule are:"+str(len(TrueRules)))
     print("The number of errors are: "+str(len(TrueErrors))+" out of "+str(len(yVector)))
-    #print("The True Rules are: "+str(TrueRules))
+    print("The True Rules are: "+str(TrueRules))
     #print("True Error are "+str(TrueErrors))
     xhat = []
     for i in range(level):
@@ -454,10 +454,10 @@ def LearnRules(datafile,mValue,alpha,beta, gamma, timeoutSec, rule_type, level, 
 def runTool():
     parser=argparse.ArgumentParser()
     parser.add_argument("dataFile",help="datafile")
-    parser.add_argument("--k", type=int, help="give value of k",default=1)
+    parser.add_argument("--m", type=int, help="give value of M",default=1)
     parser.add_argument("--alpha",type=int, help="alpha",default=10)
     parser.add_argument("--beta",type=int,help="beta",default=1)
-    parser.add_argument("--lambda", type=int, help="lambda", default=10)
+    parser.add_argument("--gamma", type=int, help="gamma", default=10)
     parser.add_argument("--timeout",type=int,help="timeout in seconds",default=300)
     parser.add_argument("--runIndex",type=int,help="run Index", default=1)
     args = parser.parse_args()
