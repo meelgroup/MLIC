@@ -7,11 +7,11 @@ This system provides MaxSAT based framework for learning interpretable classific
 The directory "Benchmarks" consists of all the benchmark files used for experiment. 
 
 The directory "Scripts" has all the scripts that were employed in testing and required for reproducibility. 
-"Script" has two subdirectory. In the "Scripts/MLIC" subdirectory we have added "MLIC.py" script which is entry script of this system. To Run MLIC.py, you will need maxhs and pbencoder (from PBLib) to be in
+"Script" has two subdirectories. In the "Scripts/MLIC" subdirectory we have added "MLIC.py" script which is the entry script of this system. To Run MLIC.py, you will need maxhs and pbencoder (from PBLib) to be in
 the PATH variable. 
 
 
-"Scripts" also contains some additional scripts. In "Scripts/MLIC" we have added "discretization.py" script that takes in the non-binarized matrix of features and categories and discretizes the matrices. "Load_bcsrule_data.py" and "Load_process_data_BCS.py" scripts contain some supplementary methods invoked in "MLIC.py". Moreover "Scripts/RuleLearning" subdirectory contains "MultiLevelLearnRules.py" and we have implemented maxSAT based systems in  "MultiLevelLearnRules.py" script. "Scripts/MLIC" also contain two subdirectories "Train" and "Test" that contain cross folded training and test data respectively.   
+"Scripts" also contains some additional scripts. In "Scripts/MLIC" we have added "discretization.py" script that takes in the non-binarized matrix of features and categories and discretizes the matrices. "Load_bcsrule_data.py" and "Load_process_data_BCS.py" scripts contain some supplementary methods invoked in "MLIC.py". Moreover "Scripts/RuleLearning" subdirectory contains "MultiLevelLearnRules.py" and we have implemented maxSAT based classification technique in  "MultiLevelLearnRules.py" script. "Scripts/MLIC" also contain two subdirectories "Train" and "Test" that contain the cross folded training and test data respectively.   
 
 
 The directory "TrainingDataBehavior" has plots for other benchmarks
@@ -23,14 +23,14 @@ other_classifiers.py contains code for comparing MaxSAT based approach with othe
 
 # Usage
 
-Run MLIC.py in "Scripts\MLIC" diretory
+Run MLIC.py in "Scripts\MLIC" directory.
 ```
 python MLIC.py <trainingfile> <testfile>
 ```
 You can pass `python MLIC.py -h` to see all the
 possible options. 
 
-Run other_classifiers.py in root directory
+Run other_classifiers.py in root directory.
 ```
 python other_classifiers.py <classifier name> <Benchmark no> 
 ```
