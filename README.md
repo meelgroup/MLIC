@@ -34,7 +34,7 @@ Run other_classifiers.py in root directory
 ```
 python other_classifiers.py <classifier name> <Benchmark no> 
 ```
-other_classifiers.py is configured for a fixed number of provided benchmarks. You can add more benchmarks in "Benchmarks/Data" directory and put separate training and test data in "Scripts/MLIC/Train" and "Scripts/MLIC/Test" directory respectively.
+other_classifiers.py is configured for a fixed number of provided benchmarks. You can add more benchmarks in "Benchmarks/Data" directory and put separate training and test data in "Scripts/MLIC/Train" and "Scripts/MLIC/Test" directory respectively. Refer to the script for additional arguments. 
 # Contact
 1. Dmitry Maliotov (dmal@alum.mit.edu)
 2. Kuldeep Meel (meel@comp.nus.edu.sg)
