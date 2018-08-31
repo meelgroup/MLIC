@@ -29,347 +29,65 @@ def ParseFiles(datafile):
         groupMap[listPosition] = currentGroupIndex
         groupList[currentIndex].append(listPosition)
     return AMatrix,yVector,groupList,groupMap,len(AMatrix[0])
-#    f = open(AMatrixFile,'r')
-#    lines = f.readlines()
-#    f.close()
-#    AMatrix = {}
-#    rowIndex = 0
-#    for line in lines:
-#        AMatrix[rowIndex] = {}
-#        fields = line.split(',')
-#        colIndex = 0
-#        for field in fields:
-#            AMatrix[rowIndex][colIndex] = int(field)
-#            colIndex += 1
-#        rowIndex += 1
-#    f = open(yVectorFile,'r')
-#    lines = f.readlines()
-#    f.close()
-#    yVector = {}
-#    rowIndex = 0
-#    for line in lines:
-#        yVector[rowIndex] = int(line.strip())
-#        rowIndex += 1
-#    return AMatrix,yVector,len(AMatrix[0])
-def GenerateWCNFFile(AMatrix,yVector,alpha,beta,xSize,wCNFFileName):
+
+
+
+def GenerateWCNFFileImplication(AMatrix, yVector, alpha, beta, xSize, level, wCNFFileName, assignList):
     cnfClauses = ''
-    topWeight = alpha*len(yVector)+1+beta*xSize
+
+    # print(numpy.sum(map(int, yVector)))
+
+    topWeight = alpha * len(yVector) + 1 + beta * xSize * level
     numClauses = 0
-    for i in range(1,xSize+1):
+    # print("xSize",xSize)
+    for i in range(1, level * xSize + 1):
         numClauses += 1
-        cnfClauses += str(beta)+' '+str(-i)+' 0\n'
-    for i in range(xSize+1, xSize+len(yVector)+1):
+        cnfClauses += str(beta) + ' ' + str(-i) + ' 0\n'
+    # print(cnfClauses)
+    for i in range(level * xSize + 1, level * xSize + len(yVector) + 1):
         numClauses += 1
-        cnfClauses += str(alpha)+' '+str(-i)+' 0\n'
+        cnfClauses += str(alpha) + ' ' + str(-i) + ' 0\n'
+        # print(cnfClauses)
+    for each_assign in assignList:
+        numClauses += 1
+        cnfClauses += str(topWeight) + ' ' + str(int(each_assign)) + ' 0\n'
+        # print(str(topWeight) + ' ' + each_assign)
     for i in range(len(yVector)):
-        noise = xSize+i+1
+        noise = level * xSize + i + 1
         implyClause = ''
         reverseImplyClauses = ''
-        if (yVector[i] == 0):
-            noise = -noise
-        implyClause += str(topWeight)+' '+str(-noise)+' '
-        for j in range(len(AMatrix[i])):
-            if (AMatrix[i][j] == 1):
-                continue
-            numClauses += 1
-            implyClause += str((j+1)*(1-AMatrix[i][j]))+' '
-            reverseImplyClauses += str(topWeight)+' '+str(noise)+' '+str(-1*(j+1)*(1-AMatrix[i][j]))+' 0\n'
-        implyClause += ' 0\n'
-        numClauses += 1
-        cnfClauses += implyClause
-        cnfClauses += reverseImplyClauses
-    header = 'p wcnf '+str(xSize+2*(len(yVector)))+' '+str(numClauses)+' '+str(topWeight)+'\n'
-    f = open(wCNFFileName,'w')
-    f.write(header)
-    f.write(cnfClauses)
-    f.close()
-def GenerateWCNFFileImplication(AMatrix,yVector,alpha,beta,xSize,wCNFFileName):
-    cnfClauses = ''
-    topWeight = alpha*len(yVector)+1+beta*xSize
-    numClauses = 0
-    for i in range(1,xSize+1):
-        numClauses += 1
-        cnfClauses += str(beta)+' '+str(-i)+' 0\n'
-    for i in range(xSize+1, xSize+len(yVector)+1):
-        numClauses += 1
-        cnfClauses += str(alpha)+' '+str(-i)+' 0\n'
-    for i in range(len(yVector)):
-        noise = xSize+i+1
-        implyClause = ''
-        reverseImplyClauses = ''
-        implyClause += str(topWeight)+' '+str(noise)+' '
-        for j in range(len(AMatrix[i])):
-            if (AMatrix[i][j] == 1):
-                continue
-            if (yVector[i] == 1):
+        implyClause += str(topWeight) + ' ' + str(noise) + ' '
+        # print(len(AMatrix[i]))
+        for each_level in range(level):
+            for j in range(len(AMatrix[i])):
+                if (AMatrix[i][j] == 1):
+                    continue
+                if (yVector[i] == 1):
+                    numClauses += 1
+                implyClause += str(int(j + each_level * xSize + 1) * int(1 - AMatrix[i][j])) + ' '
+                reverseImplyClauses += str(topWeight) + ' ' + str(noise) + ' ' + str(
+                    -1 * int(j + each_level * xSize + 1) * int(1 - AMatrix[i][j])) + ' 0\n'
+                # print("im: "+implyClause)
+                # print("ri: "+reverseImplyClauses)
+
+            implyClause += ' 0\n'
+            if (yVector[i] == 0):
                 numClauses += 1
-            implyClause += str((j+1)*(1-AMatrix[i][j]))+' '
-            reverseImplyClauses += str(topWeight)+' '+str(noise)+' '+str(-1*(j+1)*(1-AMatrix[i][j]))+' 0\n'
-        
-        implyClause += ' 0\n'
-        if (yVector[i] == 0):
-            numClauses += 1
-            cnfClauses += implyClause
-        else:
-            cnfClauses += reverseImplyClauses
-    header = 'p wcnf '+str(xSize+(len(yVector)))+' '+str(numClauses)+' '+str(topWeight)+'\n'
-    f = open(wCNFFileName,'w')
+                cnfClauses += implyClause
+                # print(cnfClauses)
+            else:
+                cnfClauses += reverseImplyClauses
+                # print(cnfClauses)
+    header = 'p wcnf ' + str(xSize * level + (len(yVector))) + ' ' + str(numClauses) + ' ' + str(topWeight) + '\n'
+    # print("header", header)
+    # print("cnfClauses", cnfClauses)
+    f = open(wCNFFileName, 'w')
     f.write(header)
+    # print(cnfClauses)
     f.write(cnfClauses)
     f.close()
-def ExtractClausesFromCNFFile(cnfFileName,topWeight,noise,auxVariableStart):
-    f = open(cnfFileName,'r')
-    lines =f.readlines()
-    f.close()
-    addedClauses = 0
-    cnfClauses = ''
-    headerSeen = False
-    for line in lines:
-        if (line.strip().startswith("p cnf")):
-            headerSeen = True
-            fields = line.strip().split()
-            totalVars = int(fields[2])
-            if (totalVars >= auxVariableStart):
-                auxVariableStart = totalVars+1
-            continue
-        if (headerSeen):
-            if (line.strip().startswith('c')):
-                continue
-            addedClauses += 1
-            cnfClauses += str(topWeight)+" "
-            if (not(noise == 0)):
-                cnfClauses += str(noise)+" "
-            cnfClauses += line.strip()+"\n"
-    return (cnfClauses,addedClauses,auxVariableStart)
-def GeneratePositiveConstraints(tempPBFile, tempOutFile, xSize, topWeight, AMatrix,rowNum, 
-        matrixTrue, mValue, noise, auxVariableStart,level):
-    matrixFalse = 1-matrixTrue
-    cnfClauses = ''
-    numClauses = 0
-    opbClauses = ''
-    addedNewClauses = ''
-    addedNumClauses = 0
-    for i in range(level):
-        clause = ''
-        rowLen = 0
-        kValue = mValue
-        for j in range(len(AMatrix[rowNum])):
-            if (AMatrix[rowNum][j] == matrixFalse):
-                continue
-            rowLen += 1
-            clause += "+1 x"+str(i*xSize+j+1)+" "
-        clause += " >= "+str(kValue)+ ";\n"
-        opbClauses += str(noise)+':'+clause
-        f = open(tempPBFile,'w')
-        f.write("* #variable= "+str(xSize)+" #constraint= 1\n*\n")
-        f.write(clause)
-        f.close()
-        cmd = "pbencoder "+tempPBFile+" -auxVar="+str(auxVariableStart)+"  > "+str(tempOutFile)
-        os.system(cmd)
-        (addedNewClauses, addedNumClauses, auxVariableStart) =  ExtractClausesFromCNFFile(tempOutFile,topWeight,noise, auxVariableStart)
-        cnfClauses += addedNewClauses
-        numClauses += addedNumClauses
-    return (cnfClauses,numClauses,auxVariableStart,opbClauses)
-def DirectlyGenerateNegativeConstraints(tempPBFile, tempOutFile, xSize, topWeight, AMatrix,rowNum, matrixTrue, mValue, 
-        noise, groupRowNoise, groupMap, groupNoiseFlag, auxVariableStart, level):
-    clause = ''
-    rowLen = 0
-    matrixFalse = 1-matrixTrue
-    maxVarIndex = xSize
-    addedClauses = ''
-    addedNumClauses = 0
-    groupClause = ''
-    firstGroupClause = True
-    levelVariable = {}
-    
-    for i in range(level):
-        levelVariable[i] = auxVariableStart
-        for j in range(len(AMatrix[rowNum])):
-            if (AMatrix[rowNum][j] == matrixFalse):
-                continue
-            addedNumClauses += 1
-            addedClauses +=str(topWeight)+' '+str(-(i*xSize+j+1))+' '+str(-levelVariable[i])+' '
-            if (groupNoiseFlag):
-                groupNoiseVar = -1
-                if (groupMap[j+1] in groupRowNoise[rowNum]):
-                    groupNoiseVar = groupRowNoise[rowNum][groupMap[j+1]]
-                else:
-                    groupNoiseVar = auxVariableStart
-                    auxVariableStart += 1
-                    groupRowNoise[rowNum][groupMap[j+1]] = groupNoiseVar
-                    if (not(firstGroupClause)):
-                        groupClause += '0\n'
-                        addedNumClauses += 1
-                    else:
-                        firstGroupClause = False
-                    groupClause += str(topWeight)+' '+str(-groupNoiseVar)+' '+str(noise)+' '
-                if(groupNoiseVar > maxVarIndex):
-                    maxVarIndex = groupNoiseVar
-                addedClauses += str(groupNoiseVar)+' '
-                groupClause += str(j+1)+' '
-            addedClauses +=' 0\n'
-        if (groupNoiseFlag):
-            addedNumClauses += 1
-            groupClause += ' 0\n'
-            addedClauses += groupClause
-        auxVariableStart += 1
-    addedClauses += str(topWeight)+' '+str(noise)+' '
-    for i in range(level):
-        addedClauses += str(levelVariable[i])+' '
-    addedClauses += ' 0\n'
-    addedNumClauses += 1
-    #print(AMatrix[rowNum])
-    #print(addedClauses)
-    return (addedClauses, addedNumClauses, auxVariableStart, groupRowNoise)
-def GenerateNegativeConstraints(tempPBFile, tempOutFile, xSize, topWeight, AMatrix,rowNum, matrixTrue, mValue, 
-        noise, groupRowNoise, groupMap, groupNoiseFlag, auxVariableStart):
-    #TODO: GroupNoise encoding still to be added fully
-    clause = ''
-    rowLen = 0
-    matrixFalse = 1-matrixTrue
-    maxVarIndex = xSize
-    groupClause = ''
-    opbClauses = ''
-    addedNumClauses = 0
-    addedClauses = ''
-    for j in range(len(AMatrix[rowNum])):
-        if (AMatrix[rowNum][j] == matrixFalse):
-            continue
-        rowLen += 1
-        clause += "+1 x"+str(j+1)+" "
-        if (groupNoiseFlag):
-            groupNoiseVar = -1
-            if (groupMap[j+1] in groupRowNoise[rowNum]):
-                groupNoiseVar = groupRowNoise[rowNum][groupMap[j+1]]
-            else:
-                groupNoiseVar = auxVariableStart
-                auxVariableStart += 1
-                groupRowNoise[rowNum][groupMap[j+1]] = groupNoiseVar
-                groupClause += '+1 x'+str(groupNoiseVar)
-            if(groupNoiseVar > maxVarIndex):
-                maxVarIndex = groupNoiseVar
-            clause += "~x"+str(groupNoiseVar)+" "
-            groupClause += " ~x"+str(j+1)+" "
-    kValue = rowLen-mValue+1
-    clause += groupClause
-    #clause += " < "+str(mValue)+";\n"
-    clause += " >= "+str(kValue)+ ";\n"
-    #opbClauses += str(noise)+':'+clause
-    f = open(tempPBFile,'w')
-    f.write("* #variable= "+str(maxVarIndex)+" #constraint= 1\n*\n")
-    f.write(clause)
-    f.close()
-    cmd = "pbencoder "+tempPBFile+" -auxVar="+str(auxVariableStart)+"  > "+str(tempOutFile)
-    os.system(cmd)
-    (addedClauses, addedNumClauses, auxVariableStart) = ExtractClausesFromCNFFile(tempOutFile,topWeight,noise, auxVariableStart)
-    return (addedClauses, addedNumClauses, auxVariableStart, groupRowNoise, opbClauses)
-def GenerateWCNFFileForPB(AMatrix,yVector, alpha, beta, gamma, mValue,xSize,wCNFFileName,groupList,
-            groupMap,groupNoiseFlag,level,runIndex,assignList):
-    cnfClauses = ''
-    numClauses = 0
-    if (not(groupNoiseFlag)):
-        gamma = 0
-    topWeight = alpha*len(yVector)+beta*2*xSize+gamma*len(yVector)*len(groupList)+1
-    matrixTrue = 1
-    clauseList = ''
-    matrixFalse = 1-matrixTrue
-    for i in range(1,level*xSize+1):
-        numClauses += 1
-        if (i%xSize != 1):
-            cnfClauses += str(beta)+' '+str(-i)+' 0\n'
-    auxVariableStart = level*xSize+1
-    for i in range(auxVariableStart, auxVariableStart+len(yVector)):
-        weight = alpha
-        if (yVector[i-auxVariableStart-1] == matrixFalse and groupNoiseFlag):
-            weight = topWeight
-        numClauses += 1
-        cnfClauses += str(weight)+' '+str(-i)+' 0\n'
-    for i in assignList:
-        numClauses += 1
-        cnfClauses += str(topWeight)+' '+str(i)+' 0\n'
-    tempPBFile = wCNFFileName[:-5]+"_"+str(runIndex)+"_temp.pb"
-    tempOutFile = wCNFFileName[:-5]+"_"+str(runIndex)+"_temp.out"
-    auxVariableStart += len(yVector)
-    groupRowNoise = {}
-    opbClauses = ''
-    for i in range(len(yVector)):
-        noise = (level*xSize+i+1)
-        addedOPBClause = ''
-        if (yVector[i] == matrixTrue):
-            (addedClauses,addedNumClauses,auxVariableStart,addedOPBClause) = GeneratePositiveConstraints(tempPBFile, tempOutFile, xSize, topWeight, AMatrix,i, 
-                    matrixTrue, mValue, noise, auxVariableStart,level)
-        else:
-            if (i not in groupRowNoise):
-                groupRowNoise[i] = {}
-            if (True and mValue==1):
-                (addedClauses,addedNumClauses,auxVariableStart, groupRowNoise) = DirectlyGenerateNegativeConstraints(tempPBFile, tempOutFile, xSize,topWeight,
-                    AMatrix, i, matrixTrue, mValue, noise, groupRowNoise, groupMap, groupNoiseFlag, auxVariableStart, level)
-            else:
-                (addedClauses,addedNumClauses,auxVariableStart, groupRowNoise, addedOPBClause) = GenerateNegativeConstraints(tempPBFile, tempOutFile, xSize,topWeight,
-                        AMatrix, i, matrixTrue, mValue, noise, groupRowNoise, groupMap, groupNoiseFlag, auxVariableStart)
-        cnfClauses += addedClauses
-        numClauses += addedNumClauses
-        opbClauses += addedOPBClause
-        continue
-        kValue =mValue
-        clause = ''
-        rowLen = 0
-        for j in range(len(AMatrix[i])):
-            if (AMatrix[i][j] == matrixFalse):
-                continue
-            rowLen += 1
-            if (yVector[i] == matrixTrue):
-                clause += "+1 x"+str(j+1)+" "
-            else:
-                clause += "+1 ~x"+str(j+1)+" "
-        if (yVector[i] == matrixFalse):
-            kValue = rowLen-mValue+1
-        clause += " >= "+str(kValue)+ ";\n"
-        clauseList += str(-noise)+":"+clause
-        f = open(tempPBFile,'w')
-        f.write("* #variable= "+str(xSize)+" #constraint= 1\n*\n")
-        f.write(clause)
-        f.close()
-        cmd = "pbencoder "+tempPBFile+" -auxVar="+str(auxVariableStart)+"  > "+str(tempOutFile)
-        os.system(cmd)
-        (addedClauses,addedNumClauses,auxVariableStart) = ExtractClausesFromCNFFile(tempOutFile,topWeight,noise, auxVariableStart)
-        cnfClauses += addedClauses
-        numClauses += addedNumClauses
-       #if (yVector[i] == 1):
-        #    exit(0)
-    for rowNum in groupRowNoise:
-        for group in groupRowNoise[rowNum]:
-            numClauses += 1
-            cnfClauses += str(gamma)+' '+str(-groupRowNoise[rowNum][group])+' 0\n'
-    for group in groupList:
-        clause = ''
-        if (len(group) <= 1):
-            continue
-        for element in group:
-            clause += "+1 ~x"+str(element)+" "
-        clause += " >= "+str(len(group) -1)+";\n"
-        #clauseList += clause
-        f = open(tempPBFile,'w')
-        f.write("* #variable= "+str(max(group))+" #constraint= 1\n*\n")
-        f.write(clause)
-        f.close()
-        cmd = "pbencoder "+tempPBFile+" -auxVar="+str(auxVariableStart)+" > "+str(tempOutFile)
-        os.system(cmd)
-        cnfClauses += addedClauses
-        numClauses += addedNumClauses
-    opbFileName = wCNFFileName[:-5].replace("/tmp","PBFiles")+"_"+str(mValue)+".opb"
-    #f = open(opbFileName,'w')
-    #f.write("* #variable= "+str(xSize+len(yVector))+" #constraint= "+str(len(yVector))+"\n")
-    #f.write("* origVar = "+str(xSize)+"\n*\n")
-    #f.write(opbClauses)
-    #f.close()
-    header = 'p wcnf '+str(auxVariableStart-1)+" "+str(numClauses)+" "+str(topWeight)+'\n'
-    cmd = 'rm '+tempOutFile+" "+tempPBFile
-    os.system(cmd)
-    f = open(wCNFFileName,'w')
-    f.write(header)
-    f.write(cnfClauses)
-    f.close()
+
+
 def usage():
     print("python LearnRules.py <AMatrixFile> <yVectorFile> <mValue> <alpha> <beta>")
     exit(0)
@@ -382,18 +100,17 @@ def LearnRules(datafile,mValue,alpha,beta, gamma, timeoutSec, rule_type, level, 
     endTime = time.time()
     print("Time taken to parse:"+str(endTime-startTime))
     startTime = time.time()
-    noiseMultiplyFactor = 1
-    if (rule_type == 'and'):
-        noiseMultiplyFactor = 1
-    if (False and (mValue == 1)):
-        GenerateWCNFFileImplication(AMatrix,yVector,alpha,beta,xSize,wCNFFileName)
-    else:
-        print("Calling PB Encoder")
-        GenerateWCNFFileForPB(AMatrix,yVector,alpha,beta,gamma,mValue,xSize,wCNFFileName,groupList,
-                    groupMap, groupNoiseFlag,level,runIndex,assignList)
+    GenerateWCNFFileImplication(AMatrix,yVector,alpha,beta,xSize,level,wCNFFileName,assignList)
     endTime = time.time()
     print("Time taken to model:"+str(endTime-startTime))
     #cmd = 'open-wbo_release '+wCNFFileName+' > '+outFileName
+
+
+    # tool_path = "../Tools/"
+    # cmd = tool_path + './maxhs -printBstSoln -cpu-lim=' + str(
+    #     timeoutSec) + ' ' + wCNFFileName + ' > ' + outFileName
+
+
     cmd = 'maxhs -printBstSoln -cpu-lim='+str(timeoutSec)+' '+wCNFFileName+' > '+outFileName
     #cmd = 'LMHS '+wCNFFileName+' > '+outFileName
     #command = ['open-wbo_release', wCNFFileName, ' > ',outFileName]
@@ -427,6 +144,7 @@ def LearnRules(datafile,mValue,alpha,beta, gamma, timeoutSec, rule_type, level, 
     TrueRules = []
     TrueErrors = []
     zeroOneSolution = []
+    print(len(fields))
     for field in fields:
         if (int(field) > 0):
             zeroOneSolution.append(1.0)

@@ -14,50 +14,6 @@ try:
     from MultiLevelLearnRules import LearnRules
 except ImportError:
     pass
-###########################################
-def solve_GT_LP_relax_noisy_CPLEX(A, y, lambda_reg, do_binary = False):
-    ''' solve the LP formulation of noisy boolean 
-    compressed sensing using CPLEX''' 
-
-    M, N = A.shape
-    
-    assert np.linalg.norm(y - y**2) <= 1e-10, "Inputs must be binary"
-
-    inds_1 = np.where(y==1)[0]
-    inds_0 = np.where(y==0)[0]
-    A1 = A[inds_1, :]; A0 = A[inds_0, :]
-    ###  introduce random small perturbations to avoid degenerate solutions
-    w_pert_x = np.ones(N) + 0.001*np.random.rand(N)
-    w_pert_xi = np.ones(M) + 0.001*np.random.rand(M, 1)
-    
-    ### try cplex directy:
-    M1 = len(inds_1)
-    M0 = len(inds_0)
-
-    w_pert_xi_pos = w_pert_xi[inds_1]
-    w_pert_xi_neg = w_pert_xi[inds_0]
-    
-    m = CPlexModel(verbosity=0)
-
-    if do_binary:  ### solve the binary problem using cuts + branch and bound
-        x_sdp = m.new(N, vtype = 'bool', lb = 0, ub=1)
-        xi_sdp0 = m.new(M0, vtype = 'bool', lb = 0)
-        xi_sdp1 = m.new(M1, vtype = 'bool', lb = 0)
-    else:
-        x_sdp = m.new(N, vtype = 'real', lb = 0, ub=1)
-        xi_sdp0 = m.new(M0, vtype = 'real', lb = 0)
-        xi_sdp1 = m.new(M1, vtype = 'real', lb = 0)
-    m.constrain(A1*x_sdp + xi_sdp1 >= 1)
-    m.constrain(A0*x_sdp == 0 + xi_sdp0)
-    value = m.minimize(x_sdp.sum() + lambda_reg*(xi_sdp0.sum() + xi_sdp1.sum()))
-    #m.minimize(w_pert_x*x_sdp + lambda_reg*w_pert_xi*xi_sdp)
-    x_hat = m[x_sdp]
-    xi_hat0 = m[xi_sdp0]
-    xi_hat1 = m[xi_sdp1]
-    xi_hat = np.zeros(M)    
-    xi_hat[inds_0] = xi_hat0
-    xi_hat[inds_1] = xi_hat1
-    return x_hat, xi_hat
 
 ###########################################
 def load_UCI_data(training_data, test_data, rule_type, tool_type,runIndex):
@@ -69,8 +25,8 @@ def load_UCI_data(training_data, test_data, rule_type, tool_type,runIndex):
     col_y = None #colNames[-1]
 
     A_df_train, A_df_test, y_train, y_test = load_process_data_BCS(training_data, test_data, colSep, rowHeader, colNames, col_y, valEq_y=None)
-    A_train = A_df_train.as_matrix()
-    A_test = A_df_test.as_matrix()
+    A_train = A_df_train.values
+    A_test = A_df_test.values
     col_to_feat = get_col_to_features_map(A_df_train)
     fname_traindump =  "/tmp/"+training_data.split('/')[-1].replace('.csv', '_'+str(runIndex)+'_tempdata.pk')
     fname_testdump = "/tmp/"+test_data.split('/')[-1].replace('.csv', '_'+str(runIndex)+'_tempdata.pk')
@@ -94,16 +50,10 @@ def run_UCI_example(training_data, test_data, lambda_reg, rule_type, tool_type, 
         beta = int(1/lambda_reg)
     print("TRAINING PHASE")
     if rule_type == 'and':
-        if (tool_type == 'lp'):
-            x_hat, xi_err = solve_GT_LP_relax_noisy_CPLEX(A_train, 1-y_train, lambda_reg)
-        elif tool_type == 'sat':
-            x_hat, xi_err, assignList = LearnRules(fname_traindump, mValue, alpha, beta, 1, timeout, rule_type, level,
+        x_hat, xi_err, assignList = LearnRules(fname_traindump, mValue, alpha, beta, 1, timeout, rule_type, level,
                                     groupNoiseFlag, runIndex, assignList)
     elif rule_type == 'or':
-        if (tool_type == 'lp'):
-            x_hat, xi_err = solve_GT_LP_relax_noisy_CPLEX(A_test, y_test, lambda_reg)
-        elif tool_type == 'sat':
-            x_hat, xi_err, assignList = LearnRules(fname_traindump, mValue, alpha, beta, 1, timeout, rule_type, level, 
+        x_hat, xi_err, assignList = LearnRules(fname_traindump, mValue, alpha, beta, 1, timeout, rule_type, level,
                                         groupNoiseFlag, runIndex, assignList)
     else:
         assert False, "Need the rule-type to be (or/and)"
@@ -133,38 +83,6 @@ def run_UCI_example(training_data, test_data, lambda_reg, rule_type, tool_type, 
     #err,err_zero_to_one, err_ones_to_zero,y_hat = calculate_error(x_hat, rule_type, A, y)
     #print(("Learned rule with %d non-zeros and %d errors out of %d:" % (nnz_rule, err, len(y_hat))))
     #print(("Zeros to One errors %d and Ones to zeros %d:\n>>>") % (err_zero_to_one, err_ones_to_zero))
-###########################################
-def run_iris_example():
-    ''' run the BCS rule-learner on a small dataset iris'''
-
-    ### load the pre-processed file with A,y, e.t.c.
-    fname_iris_mat = './Data/iris_BCS_rule_data.mat'
-    colSep = ','
-    rowHeader = None
-    colNames = ['X1', 'X2', 'sepal length', 'sepal width', 'petal length', 'petal width', 'iris species']
-    col_y = colNames[-1]
-
-    A, y, lambda_reg, ind_i_all, thr_all, feat_names = load_matlab_iris_data(fname_iris_mat)
-
-    ### also need ind_i_all, thr_all
-
-    rule_type = 'and'
-
-    if rule_type == 'and':
-        x_hat, xi_err = solve_GT_LP_relax_noisy_CPLEX(A, 1-y, lambda_reg)
-    elif rule_type == 'or':
-        x_hat, xi_err = solve_GT_LP_relax_noisy_CPLEX(A, y, lambda_reg)
-    else:
-        assert False, "Need the rule-type to be (or/and)"
-
-    ##o calculate errors + display the rule
-    nnz_rule = np.sum(np.abs(x_hat) >= 1e-4)
-    err,err_zero_to_one, err_ones_to_zero,y_hat = calculate_error(x_hat, rule_type, A, y)
-    print(("Learned rule with %d non-zeros and %d errors out of %d:" % (nnz_rule, err, len(y_hat))))
-    print(("Zeros to One errors %d and Ones to zeros %d:\n>>>") % (err_zero_to_one, err_ones_to_zero))
-    irr,y_hat = calculate_error(x_hat, rule_type, A,y)
-    rule_str_rec = recover_rule_compound(x_hat, ind_i_all, thr_all, rule_type, feat_names)
-    print(rule_str_rec)
 
 ###########################################
 def  get_col_to_features_map(A_df):
@@ -198,44 +116,6 @@ def dump_LPrule_data(fname_datadump, A, y, col_to_feat):
     data_dict = {'A': A, 'y': list(y), 'col_to_feat' : col_to_feat} ## tolist()
     pickle.dump( data_dict, open(fname_datadump, "wb" ))
 
-###########################################
-def run_iris_example_v2(fname_data, lambda_reg, rule_type = 'and'):
-    ''' run the BCS rule-learner on a small dataset iris'''
-
-    ### load the pre-processed file with A,y, e.t.c.
-    #fname_data = './Data/iris_bin.csv'
-    colSep = ','
-    rowHeader = None
-    colNames = ['X1', 'X2', 'sepal length', 'sepal width', 'petal length', 'petal width', 'iris species']
-    col_y = colNames[-1]
-
-    A_df, y = load_process_data_BCS(fname_data, colSep, rowHeader, colNames, col_y, valEq_y=2)
-    A = A_df.as_matrix()
-
-    col_to_feat = get_col_to_features_map(A_df)
-    ## TODO:// Save data for Kuldeep:
-    fname_datadump = 'TempData/kuldeep_data_iris.pk'
-    dump_LPrule_data(fname_datadump, A, y, col_to_feat)
-
-    # OLD WAY:
-    #fname_iris_mat = './Data/iris_BCS_rule_data.mat'
-    #A_alt, y_alt, lambda_reg, ind_i_all, thr_all, feat_names = load_matlab_iris_data(fname_iris_mat)
-
-    if rule_type == 'and':
-        x_hat, xi_err = solve_GT_LP_relax_noisy_CPLEX(A, 1-y, lambda_reg)
-    elif rule_type == 'or':
-        x_hat, xi_err = solve_GT_LP_relax_noisy_CPLEX(A, y, lambda_reg)
-    else:
-        assert False, "Need the rule-type to be (or/and)"
-
-    ### calculate errors + display the rule
-    nnz_rule = np.sum(np.abs(x_hat) >= 1e-4)
-    err,err_zero_to_one, err_ones_to_zero,y_hat = calculate_error(x_hat, rule_type, A, y)
-
-    print(("Learned rule with %d non-zeros and %d errors out of %d:\n>>>" % (nnz_rule, err, len(y_hat))))
-    print(("Zeros to One errors %d and Ones to zeros $d:\n>>>") % (err_zero_to_one, err_ones_to_zero))
-    rule_str_rec = recover_rule_df(A_df, x_hat, rule_type)
-    print(rule_str_rec)
 
 ###########################################
 def calculate_error(x_hat, rule_type, A, y):
@@ -260,22 +140,6 @@ def calculate_error(x_hat, rule_type, A, y):
     err_ones_to_zero = np.sum(allOnes == (y - y_hat))
     return err, err_zero_to_one, err_ones_to_zero, y_hat
 
-###########################################
-def load_matlab_iris_data(fname_iris_mat):
-
-    mat_data = sio.loadmat(fname_iris_mat)
-
-    A = mat_data['A'].astype('float')
-    y = mat_data['y'].astype('float').flatten()
-    lambda_reg = mat_data['lambda'].astype('float').flatten()[0]
-
-    ind_i_all = mat_data['ind_i_all'].astype('int').flatten()
-    thr_all = mat_data['thr_all'].astype('float').flatten()
-
-    num_feats = len(mat_data['feat_names'])
-    feat_names = [str(mat_data['feat_names'][i][0][0]) for i in range(num_feats)]
-
-    return A, y, lambda_reg, ind_i_all, thr_all, feat_names
 ###########################################
 def recover_rule_df(A_df, x_hat_vec, rule_type,level):
     ''' represent a learned rule in human-readable form, 
@@ -366,7 +230,7 @@ if __name__ == "__main__":
                         help="Interpretability parameter")
     parser.add_argument("-rule_type", nargs = "?", choices = ["and", "or"], default = "or", 
                        help = "Type of a rule (and / or)")
-    parser.add_argument("-tool_type", nargs="?", choices=["sat","lp"], default="sat",help = "Type of tool (sat/lp)")
+    parser.add_argument("-tool_type", nargs="?", choices=["sat"], default="sat",help = "Type of tool (sat)")
     parser.add_argument("-timeout", nargs="?", type=float, default=1200, help="timeout for tool")
     parser.add_argument("-mValue", nargs="?", type = int, default=1, help="m for m of N")
     parser.add_argument("-groupNoise",nargs="?", choices=["0","1"], default="1", help="Group Noise Flag")
