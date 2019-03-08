@@ -1,0 +1,13 @@
+*.aux
+*.log
+*.synctex.*
+.DS_Store
+*.out
+*.toc
+*.blg
+*.bbl
+*.pyc
+*.iml
+*.xml
+dist/*
+rulelearning.egg-info/*
