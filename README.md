@@ -78,7 +78,7 @@ Please click on "issues" at the top and [create a new issue](https://github.com/
 # How to cite
 @inproceedings{GM19,<br />
 author={Ghosh, Bishwamittra and  Meel, Kuldeep S.},<br />
-title={imli: An Incremental Framework for MaxSAT-Based Learning of Interpretable Classification Rules},<br />
+title={IMLI: An Incremental Framework for MaxSAT-Based Learning of Interpretable Classification Rules},<br />
 booktitle={Proceedings of AAAI/ACM Conference on AI, Ethics, and Society(AIES)},<br />
 month={1},<br />
 year={2019},}
