@@ -223,7 +223,7 @@ class imli():
         outputFileMaxsat = self.workDir + "/" + "model_out.txt"
 
         # generate maxsat query for dataset
-        if (self.ruleType == 'and'):
+        if (self.ruleType == 'DNF'):
             #  negate yVector for DNF rules
             self.generateWCNFFile(X, [1 - int(y[each_y]) for each_y in
                                       range(len(y))],
