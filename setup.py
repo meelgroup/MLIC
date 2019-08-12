@@ -10,7 +10,7 @@ with open(path.join(this_directory, 'README.md'), encoding='utf-8') as f:
 setup(
   name = 'rulelearning',
   packages = ['rulelearning'],
-  version = 'v1.03',
+  version = 'v1.04',
   license='MIT',
   description = 'This library can be used to generate interpretable classification rules expressed as CNF/DNF',
   long_description=long_description,
@@ -18,7 +18,7 @@ setup(
   author = 'Bishwamittra Ghosh',
   author_email = 'bishwamittra.ghosh@gmail.com',
   url = 'https://github.com/meelgroup/MLIC',
-  download_url = 'https://github.com/meelgroup/MLIC/archive/v1.03.tar.gz',
+  download_url = 'https://github.com/meelgroup/MLIC/archive/v1.04.tar.gz',
   keywords = ['Classification Rules', 'Interpretable Rules', 'CNF Classification Rules', 'DNF Classification Rules','MaxSAT-based Rule Learning'],   # Keywords that define your package best
   install_requires=[
           'numpy',
