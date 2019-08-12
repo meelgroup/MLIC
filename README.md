@@ -1,7 +1,6 @@
-# MLICv2
+# IMLI
 
-MLICv2 is an incremental learning framework based on  MaxSAT  for generating interpretable classification rules via partition-based training methodology. This tool  is based on our [paper](https://bishwamittra.github.io/publication/imli-ghosh.pdf) published in AAAI/ACM Conference on AI, Ethics, and Society(AIES), 2019. We have introduced this framework as imli in the paper.
-
+IMLI is an incremental learning framework based on  MaxSAT  for generating interpretable classification rules via partition-based training methodology. This tool  is based on our [paper](https://bishwamittra.github.io/publication/imli-ghosh.pdf) published in AAAI/ACM Conference on AI, Ethics, and Society(AIES), 2019. 
 
 
 
@@ -84,4 +83,4 @@ month={1},<br />
 year={2019},}
 
 # Old Versions
-The old version, MLIC is available under the branch "MLIC". Please read the README of the old release to know how to compile the code. 
+The old version, MLIC (non-incremental framework) is available under the branch "MLIC". Please read the README of the old release to know how to compile the code. 
