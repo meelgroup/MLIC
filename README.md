@@ -10,7 +10,7 @@ IMLI is an incremental learning framework based on  MaxSAT  for generating inter
 The directory `benchmarks/` consists of all the benchmark files used for the experiment. 
 
 The directory `rulelearning` contains all the scripts that are employed in testing and required for reproducibility. 
-In the `rulelearning` directory, we have added `imli.py` which is the incremental learning framework for generating interpretable rules. To run `imli.py`, you will need an off the self MaxSAT solver (e.g., MaxHS, Open-Wbo) to be in the PATH variable.
+In the `rulelearning` directory, we have added `imli.py` which is the incremental learning framework for generating interpretable rules. To run `imli.py`, you will need an off the self MaxSAT solver (e.g., Open-Wbo) to be in the PATH variable.
 
 # PIP Install
 Run the following command to install this framework.
@@ -22,14 +22,9 @@ pip install rulelearning
 # Install MaxSAT solvers
 
 To install Open-wbo, follow the instructions in the official [link](http://sat.inesc-id.pt/open-wbo/).
-To install MaxHS, follow the instructions in the official [link](http://www.maxhs.org/docs/overview.html).
 After the installation is complete, add the path of the binary in the PATH variable. 
 ```
 export PATH=$PATH:'/path/to/open-wbo/'
-```
-Or
-```
-export PATH=$PATH:'/path/to/maxhs/'
 ```
 Other off the shelf MaxSAT solvers can also be used for this framework.
 # Usage

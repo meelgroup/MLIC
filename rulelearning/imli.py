@@ -10,8 +10,7 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 
 class imli():
     def __init__(self, numPartition=-1, numClause=1, dataFidelity=10, weightFeature=1, solver="open-wbo", ruleType="CNF",
-                 workDir="."):
-
+                 workDir=".", timeOut=1024):
         '''
 
         :param numPartition: no of partitions of training dataset
@@ -30,17 +29,18 @@ class imli():
         self.solver = solver
         self.ruleType = ruleType
         self.workDir = workDir
-        self.verbose = False # not necessary
+        self.verbose = False  # not necessary
         self.trainingError = 0
         self.selectedFeatureIndex = []
         self.columns = []
+        self.timeOut = timeOut
 
     def __repr__(self):
-        return "<imli numPartition:%s numClause:%s dataFidelity:%s weightFeature:%s " \
-               "solver:%s ruleType:%s workDir:%s>" % (self.numPartition,
-                                                      self.numClause, self.dataFidelity,
-                                                      self.weightFeature, self.solver,
-                                                      self.ruleType, self.workDir)
+        return "imli: -->  \nnumPartition:%s \nnumClause:%s \ndataFidelity:%s \nweightFeature:%s " \
+               "\nsolver:%s \nruleType:%s \nworkDir:%s \ntimeout:%s>" % (self.numPartition,
+                                                                         self.numClause, self.dataFidelity,
+                                                                         self.weightFeature, self.solver,
+                                                                         self.ruleType, self.workDir, self.timeOut)
 
     def getColumns(self):
         return [str(a) + str(" ") + str(b) + str(" ") + str(c) for (a, b, c) in self.columns]
@@ -49,11 +49,11 @@ class imli():
         return self.trainingError
 
     def getSelectedColumnIndex(self):
-        return_list=[[] for i in range(self.numClause)]
-        ySize=len(self.columns)
-        for elem  in self.selectedFeatureIndex:
-            new_index=int(elem)-1
-            return_list[int(new_index/ySize)].append(new_index%ySize)
+        return_list = [[] for i in range(self.numClause)]
+        ySize = len(self.columns)
+        for elem in self.selectedFeatureIndex:
+            new_index = int(elem)-1
+            return_list[int(new_index/ySize)].append(new_index % ySize)
         return return_list
 
     def getNumOfPartition(self):
@@ -77,8 +77,7 @@ class imli():
     def getSolver(self):
         return self.solver
 
-    def discretize(self, file, categoricalColumnIndex=[], columnSeperator=",", fracPresent=0.9, numThreshold=9):
-
+    def discretize(self, file, categoricalColumnIndex=[], columnSeperator=",", fracPresent=0.9, numThreshold=4):
 
         # Quantile probabilities
         quantProb = np.linspace(1. / (numThreshold + 1.), numThreshold / (numThreshold + 1.), numThreshold)
@@ -97,7 +96,7 @@ class imli():
         if (self.verbose):
             print("before discrertization: ")
             print("features: ", columns)
-            print("index of categorical features: ",categoricalColumnIndex)
+            print("index of categorical features: ", categoricalColumnIndex)
         #
         # if (self.verbose):
         #     print(data.columns)
@@ -194,9 +193,9 @@ class imli():
 
     def fit(self, XTrain, yTrain):
 
-        if(self.numPartition==-1):
-            self.numPartition=2**math.floor(math.log2(len(XTrain)/32))
-
+        if(self.numPartition == -1):
+            self.numPartition = 2**math.floor(math.log2(len(XTrain)/32))
+            # print("partitions:" + str(self.numPartition))
 
         self.trainingError = 0
         self.trainingSize = len(XTrain)
@@ -236,8 +235,18 @@ class imli():
                                   isTest)
 
         # call a maxsat solver
+        if(self.solver == "open-wbo"):  # solver has timeout and experimented with open-wbo only
+            if(self.numPartition == -1):
+                cmd = self.solver + '   ' + WCNFFile + ' -cpu-lim=' + str(self.timeOut) + ' > ' + outputFileMaxsat
+            else:
+                if(int(math.ceil(self.timeOut/self.numPartition)) < 1): # give at lest 1 second as cpu-lim
+                    cmd = self.solver + '   ' + WCNFFile + ' -cpu-lim=' + str(1) + ' > ' + outputFileMaxsat
+                else:
+                    cmd = self.solver + '   ' + WCNFFile + ' -cpu-lim=' + str(int(math.ceil(self.timeOut/self.numPartition))) + ' > ' + outputFileMaxsat
+                    # print(int(math.ceil(self.timeOut/self.numPartition)))
+        else:
+            cmd = self.solver + '   ' + WCNFFile + ' > ' + outputFileMaxsat
 
-        cmd = self.solver + '   ' + WCNFFile + ' > ' + outputFileMaxsat
         os.system(cmd)
 
         # delete temp files
@@ -252,30 +261,9 @@ class imli():
         bestSolutionFound = False
         solution = ''
         for line in lines:
-            if (self.solver == "maxroster" and line.strip().startswith('v')):
+            if (line.strip().startswith('v')):
                 solution = line.strip().strip('v ')
                 break
-            elif (self.solver == "LMHS" and line.strip().startswith('v')):
-                solution = line.strip().strip('v ')
-                break
-            elif (self.solver == "qmaxsat" and line.strip().startswith('v')):
-                solution = solution + " " + line.strip().strip('v ')
-
-
-            elif (line.strip().startswith('v') and optimumFound):
-                solution = line.strip().strip('v ')
-                break
-            elif (line.strip().startswith('c ') and bestSolutionFound):
-                solution = line.strip().strip('c ')
-                break
-            elif (line.strip().startswith('s OPTIMUM FOUND')):
-                optimumFound = True
-                # if (self.verbose):
-                #     print("Optimum solution found")
-            elif (line.strip().startswith('c Best Model Found:')):
-                bestSolutionFound = True
-                # if (self.verbose):
-                #     print("Best solution found")
 
         fields = solution.split()
         TrueRules = []
@@ -430,7 +418,7 @@ class imli():
             # applicable for the 1st partition
             isEmptyAssignList = True
 
-            total_additional_weight = 0;
+            total_additional_weight = 0
             positiveLiteralWeight = self.weightFeature
             for each_assign in self.assignList:
                 isEmptyAssignList = False
