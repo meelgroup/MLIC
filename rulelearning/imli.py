@@ -9,11 +9,11 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 
 
 class imli():
-    def __init__(self, numPartition=-1, numClause=1, dataFidelity=10, weightFeature=1, solver="open-wbo", ruleType="CNF",
-                 workDir=".", timeOut=1024):
+    def __init__(self, numBatch=-1, numClause=1, dataFidelity=10, weightFeature=1, solver="open-wbo", ruleType="CNF",
+                 workDir=".", timeOut=1024, verbose=False):
         '''
 
-        :param numPartition: no of partitions of training dataset
+        :param numBatch: no of Batchs of training dataset
         :param numClause: no of clause in the formula
         :param dataFidelity: weight corresponding to accuracy
         :param weightFeature: weight corresponding to selected features
@@ -22,42 +22,31 @@ class imli():
         :param workDir: working directory
         :param verbose: True for debug
         '''
-        self.numPartition = numPartition
+        self.numBatch = numBatch
         self.numClause = numClause
         self.dataFidelity = dataFidelity
         self.weightFeature = weightFeature
         self.solver = solver
         self.ruleType = ruleType
         self.workDir = workDir
-        self.verbose = False  # not necessary
-        self.trainingError = 0
-        self.selectedFeatureIndex = []
-        self.columns = []
+        self.verbose = verbose  # not necessary
+        self.__selectedFeatureIndex = []
         self.timeOut = timeOut
 
     def __repr__(self):
-        return "imli: -->  \nnumPartition:%s \nnumClause:%s \ndataFidelity:%s \nweightFeature:%s " \
-               "\nsolver:%s \nruleType:%s \nworkDir:%s \ntimeout:%s>" % (self.numPartition,
-                                                                         self.numClause, self.dataFidelity,
-                                                                         self.weightFeature, self.solver,
-                                                                         self.ruleType, self.workDir, self.timeOut)
-
-    def getColumns(self):
-        return [str(a) + str(" ") + str(b) + str(" ") + str(c) for (a, b, c) in self.columns]
-
-    def getTrainingError(self):
-        return self.trainingError
+        print("\n\nIMLI:->")
+        return '\n'.join(" - %s: %s" % (item, value) for (item, value) in vars(self).items() if "__" not in item)
 
     def getSelectedColumnIndex(self):
         return_list = [[] for i in range(self.numClause)]
-        ySize = len(self.columns)
-        for elem in self.selectedFeatureIndex:
+        ySize = self.numFeatures
+        for elem in self.__selectedFeatureIndex:
             new_index = int(elem)-1
             return_list[int(new_index/ySize)].append(new_index % ySize)
         return return_list
 
-    def getNumOfPartition(self):
-        return self.numPartition
+    def getNumOfBatch(self):
+        return self.numBatch
 
     def getNumOfClause(self):
         return self.numClause
@@ -94,10 +83,13 @@ class imli():
         #     print(columns)
         #     print(categoricalColumnIndex)
         if (self.verbose):
-            print("before discrertization: ")
-            print("features: ", columns)
-            print("index of categorical features: ", categoricalColumnIndex)
-        #
+            print("\n\nApplying quantile based discretization")
+            print("- file name: ", file)
+            print("- categorical features index: ", categoricalColumnIndex)
+            print("- number of bins: ", numThreshold)
+            # print("- features: ", columns)
+            print("- number of features:", len(columns))
+
         # if (self.verbose):
         #     print(data.columns)
 
@@ -112,7 +104,7 @@ class imli():
         X = pd.DataFrame(columns=pd.MultiIndex.from_arrays([[], [], []], names=['feature', 'operation', 'value']))
         thresh = {}
         column_counter = 1
-        self.columnInfo = []
+        self.__columnInfo = []
         # Iterate over columns
         count = 0
         for c in data:
@@ -130,7 +122,7 @@ class imli():
                 X[('is not', c, '')] = data[c].replace(np.sort(data[c].unique()), [1, 0])
 
                 temp = [1, column_counter, column_counter + 1]
-                self.columnInfo.append(temp)
+                self.__columnInfo.append(temp)
                 column_counter += 2
 
             # Categorical column
@@ -148,7 +140,7 @@ class imli():
                 X = pd.concat([X, Anew], axis=1)
 
                 temp = [2, column_counter, column_counter + 1]
-                self.columnInfo.append(temp)
+                self.__columnInfo.append(temp)
                 column_counter += 2
 
             # Ordinal column
@@ -179,35 +171,43 @@ class imli():
                 temp = [3]
                 temp = temp + [column_counter + nc for nc in range(addedColumn)]
                 column_counter += addedColumn
-                self.columnInfo.append(temp)
+                self.__columnInfo.append(temp)
                 temp = [4]
                 temp = temp + [column_counter + nc for nc in range(addedColumn)]
                 column_counter += addedColumn
-                self.columnInfo.append(temp)
+                self.__columnInfo.append(temp)
             else:
                 # print(("Skipping column '" + c + "': data type cannot be handled"))
                 continue
             count += 1
-        self.columns = X.columns
-        return X.as_matrix(), y.values.ravel()
+
+        if(self.verbose):
+            print("\n\nAfter applying discretization")
+            print("- number of discretized features: ", len(X.columns))
+        return X.as_matrix(), y.values.ravel(), X.columns
 
     def fit(self, XTrain, yTrain):
 
-        if(self.numPartition == -1):
-            self.numPartition = 2**math.floor(math.log2(len(XTrain)/32))
-            # print("partitions:" + str(self.numPartition))
+        if(self.numBatch == -1):
+            self.numBatch = 2**math.floor(math.log2(len(XTrain)/32))
+            # print("Batchs:" + str(self.numBatch))
 
-        self.trainingError = 0
         self.trainingSize = len(XTrain)
+        if(self.trainingSize > 0):
+            self.numFeatures = len(XTrain[0])
 
-        XTrains, yTrains = self.partitionWithEqualProbability(XTrain, yTrain)
+        XTrains, yTrains = self.__getBatchWithEqualProbability(XTrain, yTrain)
 
-        self.assignList = []
-        for each_partition in range(self.numPartition):
-            self.learnModel(XTrains[each_partition], yTrains[each_partition], isTest=False)
+        self.__assignList = []
+        for each_batch in range(self.numBatch):
+            if(self.verbose):
+                print("\nTraining started for batch: ", each_batch+1)
+            self.__learnModel(XTrains[each_batch], yTrains[each_batch], isTest=False)
 
     def predict(self, XTest, yTest):
-        predictions = self.learnModel(XTest, yTest, isTest=True)
+        if(self.verbose):
+            print("\nPrediction through MaxSAT formulation")
+        predictions = self.__learnModel(XTest, yTest, isTest=True)
         yhat = []
         for i in range(len(predictions)):
             if (int(predictions[i]) > 0):
@@ -216,7 +216,7 @@ class imli():
                 yhat.append(yTest[i])
         return yhat
 
-    def learnModel(self, X, y, isTest):
+    def __learnModel(self, X, y, isTest):
         # temp files to save maxsat query in wcnf format
         WCNFFile = self.workDir + "/" + "model.wcnf"
         outputFileMaxsat = self.workDir + "/" + "model_out.txt"
@@ -224,26 +224,26 @@ class imli():
         # generate maxsat query for dataset
         if (self.ruleType == 'DNF'):
             #  negate yVector for DNF rules
-            self.generateWCNFFile(X, [1 - int(y[each_y]) for each_y in
-                                      range(len(y))],
-                                  len(X[0]), WCNFFile,
-                                  isTest)
+            self.__generateWcnfFile(X, [1 - int(y[each_y]) for each_y in
+                                        range(len(y))],
+                                    len(X[0]), WCNFFile,
+                                    isTest)
 
         else:
-            self.generateWCNFFile(X, y, len(X[0]),
-                                  WCNFFile,
-                                  isTest)
+            self.__generateWcnfFile(X, y, len(X[0]),
+                                    WCNFFile,
+                                    isTest)
 
         # call a maxsat solver
-        if(self.solver == "open-wbo"):  # solver has timeout and experimented with open-wbo only
-            if(self.numPartition == -1):
+        if(self.solver == "open-wbo" or "maxhs"):  # solver has timeout and experimented with open-wbo only
+            if(self.numBatch == -1):
                 cmd = self.solver + '   ' + WCNFFile + ' -cpu-lim=' + str(self.timeOut) + ' > ' + outputFileMaxsat
             else:
-                if(int(math.ceil(self.timeOut/self.numPartition)) < 1): # give at lest 1 second as cpu-lim
+                if(int(math.ceil(self.timeOut/self.numBatch)) < 1):  # give at lest 1 second as cpu-lim
                     cmd = self.solver + '   ' + WCNFFile + ' -cpu-lim=' + str(1) + ' > ' + outputFileMaxsat
                 else:
-                    cmd = self.solver + '   ' + WCNFFile + ' -cpu-lim=' + str(int(math.ceil(self.timeOut/self.numPartition))) + ' > ' + outputFileMaxsat
-                    # print(int(math.ceil(self.timeOut/self.numPartition)))
+                    cmd = self.solver + '   ' + WCNFFile + ' -cpu-lim=' + str(int(math.ceil(self.timeOut/self.numBatch))) + ' > ' + outputFileMaxsat
+                    # print(int(math.ceil(self.timeOut/self.numBatch)))
         else:
             cmd = self.solver + '   ' + WCNFFile + ' > ' + outputFileMaxsat
 
@@ -257,8 +257,6 @@ class imli():
         f = open(outputFileMaxsat, 'r')
         lines = f.readlines()
         f.close()
-        optimumFound = False
-        bestSolutionFound = False
         solution = ''
         for line in lines:
             if (line.strip().startswith('v')):
@@ -270,7 +268,8 @@ class imli():
         TrueErrors = []
         zeroOneSolution = []
 
-        fields = self.pruneRules(fields, len(X[0]))
+        fields = self.__pruneRules(fields, len(X[0]))
+
         for field in fields:
             if (int(field) > 0):
                 zeroOneSolution.append(1.0)
@@ -285,13 +284,14 @@ class imli():
                         X[0]) + len(y)):
                     TrueErrors.append(field)
 
-        # if (self.verbose):
-        #     print("The number of True Rule are: " + str(len(TrueRules)))
-        #     print("The number of errors are:    " + str(len(TrueErrors)) + " out of " + str(len(y)))
-        self.xhat = []
+        if (self.verbose and isTest == False):
+            print("\n\nBatch tarining complete")
+            print("- number of literals in the rule: " + str(len(TrueRules)))
+            print("- number of training errors:    " + str(len(TrueErrors)) + " out of " + str(len(y)))
+        self.__xhat = []
 
         for i in range(self.numClause):
-            self.xhat.append(np.array(
+            self.__xhat.append(np.array(
                 zeroOneSolution[i * len(X[0]):(i + 1) * len(X[0])]))
         err = np.array(zeroOneSolution[len(X[0]) * self.numClause: len(
             X[0]) * self.numClause + len(y)])
@@ -301,17 +301,16 @@ class imli():
         os.system(cmd)
 
         if (not isTest):
-            self.assignList = fields[:self.numClause * len(X[0])]
-            self.trainingError += len(TrueErrors)
-            self.selectedFeatureIndex = TrueRules
+            self.__assignList = fields[:self.numClause * len(X[0])]
+            self.__selectedFeatureIndex = TrueRules
 
         return fields[self.numClause * len(X[0]):len(y) + self.numClause * len(X[0])]
 
-    def pruneRules(self, fields, xSize):
+    def __pruneRules(self, fields, xSize):
         # algorithm 1 in paper
 
         new_fileds = fields
-        end_of_column_list = [self.columnInfo[i][-1] for i in range(len(self.columnInfo))]
+        end_of_column_list = [self.__columnInfo[i][-1] for i in range(len(self.__columnInfo))]
         freq_end_of_column_list = [[[0, 0] for i in range(len(end_of_column_list))] for j in range(self.numClause)]
         variable_contained_list = [[[] for i in range(len(end_of_column_list))] for j in range(self.numClause)]
 
@@ -323,7 +322,7 @@ class imli():
                     if (variable <= end_of_column_list[j]):
                         variable_contained_list[clause_position][j].append(clause_position * xSize + variable)
                         freq_end_of_column_list[clause_position][j][0] += 1
-                        freq_end_of_column_list[clause_position][j][1] = self.columnInfo[j][0]
+                        freq_end_of_column_list[clause_position][j][1] = self.__columnInfo[j][0]
                         break
         for l in range(self.numClause):
 
@@ -341,61 +340,61 @@ class imli():
                                 variable_contained_list[l][i][j])
         return new_fileds
 
-    def partitionWithEqualProbability(self, X, y):
+    def __getBatchWithEqualProbability(self, X, y):
         '''
             Steps:
                 1. seperate data based on class value
-                2. partition each seperate data into partition_count batches using test_train_split method with 50% part in each
+                2. Batch each seperate data into Batch_count batches using test_train_split method with 50% part in each
                 3. merge one seperate batche from each class and save
             :param X:
             :param y:
-            :param partition_count:
+            :param Batch_count:
             :param location:
             :param file_name_header:
             :param column_set_list: uses for incremental approach
             :return:
             '''
-        partition_count = self.numPartition
+        Batch_count = self.numBatch
         # y = y.values.ravel()
         max_y = int(y.max())
         min_y = int(y.min())
 
         X_list = [[] for i in range(max_y - min_y + 1)]
         y_list = [[] for i in range(max_y - min_y + 1)]
-        level = int(math.log(partition_count, 2.0))
+        level = int(math.log(Batch_count, 2.0))
         for i in range(len(y)):
             inserting_index = int(y[i])
             y_list[inserting_index - min_y].append(y[i])
             X_list[inserting_index - min_y].append(X[i])
 
-        final_partition_X_train = [[] for i in range(partition_count)]
-        final_partition_y_train = [[] for i in range(partition_count)]
+        final_Batch_X_train = [[] for i in range(Batch_count)]
+        final_Batch_y_train = [[] for i in range(Batch_count)]
         for each_class in range(len(X_list)):
-            partition_list_X_train = [X_list[each_class]]
-            partition_list_y_train = [y_list[each_class]]
+            Batch_list_X_train = [X_list[each_class]]
+            Batch_list_y_train = [y_list[each_class]]
 
             for i in range(level):
                 for j in range(int(math.pow(2, i))):
                     A_train_1, A_train_2, y_train_1, y_train_2 = train_test_split(
-                        partition_list_X_train[int(math.pow(2, i)) + j - 1],
-                        partition_list_y_train[int(math.pow(2, i)) + j - 1],
+                        Batch_list_X_train[int(math.pow(2, i)) + j - 1],
+                        Batch_list_y_train[int(math.pow(2, i)) + j - 1],
                         test_size=0.5,
                         random_state=None)  # random state for keeping consistency between lp and maxsat approach
-                    partition_list_X_train.append(A_train_1)
-                    partition_list_X_train.append(A_train_2)
-                    partition_list_y_train.append(y_train_1)
-                    partition_list_y_train.append(y_train_2)
+                    Batch_list_X_train.append(A_train_1)
+                    Batch_list_X_train.append(A_train_2)
+                    Batch_list_y_train.append(y_train_1)
+                    Batch_list_y_train.append(y_train_2)
 
-            partition_list_y_train = partition_list_y_train[partition_count - 1:]
-            partition_list_X_train = partition_list_X_train[partition_count - 1:]
+            Batch_list_y_train = Batch_list_y_train[Batch_count - 1:]
+            Batch_list_X_train = Batch_list_X_train[Batch_count - 1:]
 
-            for i in range(partition_count):
-                final_partition_y_train[i] = final_partition_y_train[i] + partition_list_y_train[i]
-                final_partition_X_train[i] = final_partition_X_train[i] + partition_list_X_train[i]
+            for i in range(Batch_count):
+                final_Batch_y_train[i] = final_Batch_y_train[i] + Batch_list_y_train[i]
+                final_Batch_X_train[i] = final_Batch_X_train[i] + Batch_list_X_train[i]
 
-        return final_partition_X_train[:partition_count], final_partition_y_train[:partition_count]
+        return final_Batch_X_train[:Batch_count], final_Batch_y_train[:Batch_count]
 
-    def learnSoftClauses(self, isTestPhase, xSize, yVector):
+    def __learnSoftClauses(self, isTestPhase, xSize, yVector):
         cnfClauses = ''
         numClauses = 0
 
@@ -411,16 +410,16 @@ class imli():
 
             # for testing, the positive assigned feature variables are converted to hard clauses
             # so that  their assignment is kept consistent and only noise variables are considered soft,
-            for each_assign in self.assignList:
+            for each_assign in self.__assignList:
                 numClauses += 1
                 cnfClauses += str(topWeight) + ' ' + each_assign + ' 0\n'
         else:
-            # applicable for the 1st partition
+            # applicable for the 1st Batch
             isEmptyAssignList = True
 
             total_additional_weight = 0
             positiveLiteralWeight = self.weightFeature
-            for each_assign in self.assignList:
+            for each_assign in self.__assignList:
                 isEmptyAssignList = False
                 numClauses += 1
                 if (int(each_assign) > 0):
@@ -447,13 +446,17 @@ class imli():
 
             topWeight = int(self.dataFidelity * len(yVector) + 1 + total_additional_weight)
 
+        if(self.verbose):
+            print("- number of soft clauses: ", numClauses)
+                
+
         return topWeight, numClauses, cnfClauses
 
-    def generateWCNFFile(self, AMatrix, yVector, xSize, WCNFFile,
-                         isTestPhase):
+    def __generateWcnfFile(self, AMatrix, yVector, xSize, WCNFFile,
+                           isTestPhase):
         # learn soft clauses associated with feature variables and noise variables
-        topWeight, numClauses, cnfClauses = self.learnSoftClauses(isTestPhase, xSize,
-                                                                  yVector)
+        topWeight, numClauses, cnfClauses = self.__learnSoftClauses(isTestPhase, xSize,
+                                                                    yVector)
 
         # learn hard clauses,
         additionalVariable = 0
@@ -499,13 +502,18 @@ class imli():
         f.write(cnfClauses)
         f.close()
 
-    def getRule(self):
+        if(self.verbose):
+            print("- number of Boolean variables:", additionalVariable + xSize * self.numClause + (len(yVector)))
+            print("- number of hard and soft clauses:", numClauses)
+
+
+    def getRule(self, columns):
         generatedRule = '( '
         for i in range(self.numClause):
-            xHatElem = self.xhat[i]
+            xHatElem = self.__xhat[i]
             inds_nnz = np.where(abs(xHatElem) > 1e-4)[0]
 
-            str_clauses = [' '.join(self.columns[ind]) for ind in inds_nnz]
+            str_clauses = [' '.join(columns[ind]) for ind in inds_nnz]
             if (self.ruleType == "CNF"):
                 rule_sep = ' %s ' % "or"
             else:
