@@ -4,7 +4,6 @@ import warnings
 import math
 import os
 from sklearn.model_selection import train_test_split
-
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
 
@@ -32,6 +31,48 @@ class imli():
         self.verbose = verbose  # not necessary
         self.__selectedFeatureIndex = []
         self.timeOut = timeOut
+        self.__isFrequencyBasedDiscretization = False
+
+    def discretize_orange(self, csv_file):
+        import Orange
+        self.__isFrequencyBasedDiscretization = True
+        data = Orange.data.Table(csv_file)
+        # Run impute operation for handling missing values
+        imputer = Orange.preprocess.Impute()
+        data = imputer(data)
+        # Discretize datasets
+        discretizer = Orange.preprocess.Discretize()
+        discretizer.method = Orange.preprocess.discretize.EntropyMDL(
+            force=False)
+        discetized_data = discretizer(data)
+        categorical_columns = [elem.name for elem in discetized_data.domain[:-1]]
+        # Apply one hot encoding on X (Using continuizer of Orange)
+        continuizer = Orange.preprocess.Continuize()
+        binarized_data = continuizer(discetized_data)
+        # self.columns = [binarized_data.domain[i].name for i in range(
+        #     len(binarized_data.domain)-1)]
+        # print(self.columns)
+        columns = []
+        for i in range(len(binarized_data.domain)-1):
+            column = binarized_data.domain[i].name
+            if("<" in column):
+                column = column.replace("=<", "_l_")
+            elif("≥" in column):
+                column = column.replace("=≥", "_ge_")
+            elif("=" in column):
+                if("-" in column):
+                    column = column.replace("=", "_eq_(")
+                    column = column+")"
+                else:
+                    column = column.replace("=", "_eq_")
+                    column = column
+            columns.append(column)
+        # print(self.columns)
+        if(self.verbose):
+            print("Applying frequency based discretization using Orange library")
+            print("- file name: ", csv_file)
+            print("- the number of discretized features:", len(columns))
+        return binarized_data.X, binarized_data.Y,  columns
 
     def __repr__(self):
         print("\n\nIMLI:->")
@@ -268,7 +309,8 @@ class imli():
         TrueErrors = []
         zeroOneSolution = []
 
-        fields = self.__pruneRules(fields, len(X[0]))
+        if(not self.__isFrequencyBasedDiscretization):
+            fields = self.__pruneRules(fields, len(X[0]))
 
         for field in fields:
             if (int(field) > 0):
@@ -448,7 +490,6 @@ class imli():
 
         if(self.verbose):
             print("- number of soft clauses: ", numClauses)
-                
 
         return topWeight, numClauses, cnfClauses
 
@@ -506,14 +547,16 @@ class imli():
             print("- number of Boolean variables:", additionalVariable + xSize * self.numClause + (len(yVector)))
             print("- number of hard and soft clauses:", numClauses)
 
-
     def getRule(self, columns):
         generatedRule = '( '
         for i in range(self.numClause):
             xHatElem = self.__xhat[i]
             inds_nnz = np.where(abs(xHatElem) > 1e-4)[0]
 
-            str_clauses = [' '.join(columns[ind]) for ind in inds_nnz]
+            if(self.__isFrequencyBasedDiscretization):
+                str_clauses = [''.join(columns[ind]) for ind in inds_nnz]
+            else:
+                str_clauses = [' '.join(columns[ind]) for ind in inds_nnz]
             if (self.ruleType == "CNF"):
                 rule_sep = ' %s ' % "or"
             else:
@@ -531,5 +574,10 @@ class imli():
                 if (self.ruleType == 'CNF'):
                     generatedRule += ' ) and \n( '
         generatedRule += ')'
+
+        if(self.__isFrequencyBasedDiscretization):
+            generatedRule = generatedRule.replace('_l_', ' < ')
+            generatedRule = generatedRule.replace('_ge_', ' >= ')
+            generatedRule = generatedRule.replace('_eq_', ' = ')
 
         return generatedRule
