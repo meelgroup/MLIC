@@ -4,11 +4,13 @@ import warnings
 import math
 import os
 from sklearn.model_selection import train_test_split
+import random
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
 
 class imli():
-    def __init__(self, numBatch=-1, numClause=1, dataFidelity=10, weightFeature=1, solver="open-wbo", ruleType="CNF",
+    def __init__(self, iterations=-1, numClause=1, dataFidelity=10, weightFeature=1, threshold_literal=-1, threshold_clause=-1,
+                 solver="open-wbo", ruleType="CNF", samplesize=0.5,
                  workDir=".", timeOut=1024, verbose=False):
         '''
 
@@ -20,18 +22,30 @@ class imli():
         :param ruleType: type of rule {CNF,DNF}
         :param workDir: working directory
         :param verbose: True for debug
+
+        --- more are added later
+
         '''
-        self.numBatch = numBatch
+        self.iterations = iterations
         self.numClause = numClause
         self.dataFidelity = dataFidelity
         self.weightFeature = weightFeature
         self.solver = solver
         self.ruleType = ruleType
         self.workDir = workDir
-        self.verbose = verbose  # not necessary
+        self.verbose = verbose
         self.__selectedFeatureIndex = []
         self.timeOut = timeOut
+        self.memlimit = 1000*16
         self.__isFrequencyBasedDiscretization = False
+        self.learn_eta_literal = False
+        self.learn_eta_clause = False
+        self.threshold_literal = threshold_literal
+        self.threshold_clause = threshold_clause
+
+        if(self.ruleType == "checklist"):
+            self.solver = "cplex"  # this is the default solver for learning rules in checklists
+            self.samplesize = samplesize
 
     def discretize_orange(self, csv_file):
         import Orange
@@ -87,7 +101,7 @@ class imli():
         return return_list
 
     def getNumOfBatch(self):
-        return self.numBatch
+        return self.iterations
 
     def getNumOfClause(self):
         return self.numClause
@@ -227,11 +241,62 @@ class imli():
             print("- number of discretized features: ", len(X.columns))
         return X.as_matrix(), y.values.ravel(), X.columns
 
+    def __fit_checklist(self, XTrain, yTrain):
+
+        
+        if (self.threshold_clause == -1):
+            self.learn_eta_clause = True
+        if (self.threshold_literal == -1):
+            self.learn_eta_literal = True
+
+        if(self.iterations==-1): # when not specified
+            self.iterations = int(math.ceil(1/self.samplesize))
+            
+        self.trainingSize = len(XTrain)
+        self.__assignList = []
+        
+        # define weight (use usual regularization, nothing)
+        # self.weight_feature = (1-self.lamda)/(self.level*len(self.column_names))
+        # self.weight_datafidelity = self.lamda/(self.trainingSize)
+
+        # reorder X, y based on target class, when sampling is allowed
+        # if(self.sampling):
+        XTrain_pos = []
+        yTrain_pos = []
+        XTrain_neg = []
+        yTrain_neg = []
+        for i in range(self.trainingSize):
+            if(yTrain[i] == 1):
+                XTrain_pos.append(XTrain[i])
+                yTrain_pos.append(yTrain[i])
+            else:
+                XTrain_neg.append(XTrain[i])
+                yTrain_neg.append(yTrain[i])
+
+        Xtrain = XTrain_pos + XTrain_neg
+        ytrain = yTrain_pos + yTrain_neg
+
+        for i in range(self.iterations):
+            if(self.verbose):
+                print("\n\n")
+                print("sampling-based minibatch method called")
+
+                print("iteration", i+1)
+            XTrain_sampled, yTrain_sampled = self.__generatSamples(XTrain, yTrain)
+
+            assert len(XTrain[0]) == len(XTrain_sampled[0])
+
+            self.__call_cplex(XTrain_sampled, yTrain_sampled)
+
     def fit(self, XTrain, yTrain):
 
-        if(self.numBatch == -1):
-            self.numBatch = 2**math.floor(math.log2(len(XTrain)/32))
-            # print("Batchs:" + str(self.numBatch))
+        if(self.ruleType == "checklist"):
+            self.__fit_checklist(XTrain, yTrain)
+            return
+
+        if(self.iterations == -1):
+            self.iterations = 2**math.floor(math.log2(len(XTrain)/32))
+            # print("Batchs:" + str(self.iterations))
 
         self.trainingSize = len(XTrain)
         if(self.trainingSize > 0):
@@ -240,12 +305,42 @@ class imli():
         XTrains, yTrains = self.__getBatchWithEqualProbability(XTrain, yTrain)
 
         self.__assignList = []
-        for each_batch in range(self.numBatch):
+        for each_batch in range(self.iterations):
             if(self.verbose):
                 print("\nTraining started for batch: ", each_batch+1)
             self.__learnModel(XTrains[each_batch], yTrains[each_batch], isTest=False)
 
     def predict(self, XTest, yTest):
+
+        if(self.ruleType == "checklist"):
+            y_hat = []
+            for i in range(len(yTest)):
+                dot_value = [0 for eachLevel in range(self.numClause)]
+                for j in range(len(XTest[i])):
+                    for eachLevel in range(self.numClause):
+                        dot_value[eachLevel] += XTest[i][j] * \
+                            self.__assignList[eachLevel * len(XTest[i]) + j]
+                if (yTest[i] == 1):
+                    correctClauseCount = 0
+                    for eachLevel in range(self.numClause):
+                        if (dot_value[eachLevel] >= self.threshold_literal_learned[eachLevel]):
+                            correctClauseCount += 1
+                    if (correctClauseCount >= self.threshold_clause_learned):
+                        y_hat.append(1)
+                    else:
+                        y_hat.append(0)
+
+                else:
+                    correctClauseCount = 0
+                    for eachLevel in range(self.numClause):
+                        if (dot_value[eachLevel] < self.threshold_literal_learned[eachLevel]):
+                            correctClauseCount += 1
+                    if (correctClauseCount > self.numClause - self.threshold_clause_learned):
+                        y_hat.append(0)
+                    else:
+                        y_hat.append(1)
+            return y_hat
+
         if(self.verbose):
             print("\nPrediction through MaxSAT formulation")
         predictions = self.__learnModel(XTest, yTest, isTest=True)
@@ -277,14 +372,14 @@ class imli():
 
         # call a maxsat solver
         if(self.solver == "open-wbo" or "maxhs"):  # solver has timeout and experimented with open-wbo only
-            if(self.numBatch == -1):
+            if(self.iterations == -1):
                 cmd = self.solver + '   ' + WCNFFile + ' -cpu-lim=' + str(self.timeOut) + ' > ' + outputFileMaxsat
             else:
-                if(int(math.ceil(self.timeOut/self.numBatch)) < 1):  # give at lest 1 second as cpu-lim
+                if(int(math.ceil(self.timeOut/self.iterations)) < 1):  # give at lest 1 second as cpu-lim
                     cmd = self.solver + '   ' + WCNFFile + ' -cpu-lim=' + str(1) + ' > ' + outputFileMaxsat
                 else:
-                    cmd = self.solver + '   ' + WCNFFile + ' -cpu-lim=' + str(int(math.ceil(self.timeOut/self.numBatch))) + ' > ' + outputFileMaxsat
-                    # print(int(math.ceil(self.timeOut/self.numBatch)))
+                    cmd = self.solver + '   ' + WCNFFile + ' -cpu-lim=' + str(int(math.ceil(self.timeOut/self.iterations))) + ' > ' + outputFileMaxsat
+                    # print(int(math.ceil(self.timeOut/self.iterations)))
         else:
             cmd = self.solver + '   ' + WCNFFile + ' > ' + outputFileMaxsat
 
@@ -396,7 +491,7 @@ class imli():
             :param column_set_list: uses for incremental approach
             :return:
             '''
-        Batch_count = self.numBatch
+        Batch_count = self.iterations
         # y = y.values.ravel()
         max_y = int(y.max())
         min_y = int(y.min())
@@ -547,16 +642,46 @@ class imli():
             print("- number of Boolean variables:", additionalVariable + xSize * self.numClause + (len(yVector)))
             print("- number of hard and soft clauses:", numClauses)
 
-    def getRule(self, columns):
+    def getRule(self, features):
+
+        if(self.ruleType == "checklist"):  # naive copy paste
+            no_features = len(features)
+            # self.rule_size = 0
+            rule = '[ ( '
+            for eachLevel in range(self.numClause):
+
+                for literal_index in range(no_features):
+                    if (self.__assignList[eachLevel * no_features + literal_index] >= 1):
+                        # rule += "  X_" + str(literal_index + 1) + "  +"
+                        if(self.__isFrequencyBasedDiscretization):
+                            rule += " " + features[literal_index] + "  +"
+                        else:
+                            rule += " " + ' '.join(features[literal_index]) + "  +"
+                        # self.rule_size += 1
+                rule = rule[:-1]
+                rule += ' )>= ' + str(self.threshold_literal_learned[eachLevel]) + "  ]"
+
+                if (eachLevel < self.numClause - 1):
+                    rule += ' +\n[ ( '
+            rule += "  >= " + str(self.threshold_clause_learned)
+
+            if(self.__isFrequencyBasedDiscretization):
+
+                rule = rule.replace('_l_', ' < ')
+                rule = rule.replace('_ge_', ' >= ')
+                rule = rule.replace('_eq_', ' = ')
+
+            return rule
+
         generatedRule = '( '
         for i in range(self.numClause):
             xHatElem = self.__xhat[i]
             inds_nnz = np.where(abs(xHatElem) > 1e-4)[0]
 
             if(self.__isFrequencyBasedDiscretization):
-                str_clauses = [''.join(columns[ind]) for ind in inds_nnz]
+                str_clauses = [''.join(features[ind]) for ind in inds_nnz]
             else:
-                str_clauses = [' '.join(columns[ind]) for ind in inds_nnz]
+                str_clauses = [' '.join(features[ind]) for ind in inds_nnz]
             if (self.ruleType == "CNF"):
                 rule_sep = ' %s ' % "or"
             else:
@@ -581,3 +706,372 @@ class imli():
             generatedRule = generatedRule.replace('_eq_', ' = ')
 
         return generatedRule
+
+    def __generatSamples(self, XTrain, yTrain):
+
+        num_pos_samples = sum(x > 0 for x in yTrain)
+
+        list_of_random_index = random.sample(
+            [i for i in range(num_pos_samples)], int(num_pos_samples * self.samplesize)) + random.sample(
+            [i for i in range(num_pos_samples, self.trainingSize)], int((self.trainingSize - num_pos_samples) * self.samplesize))
+
+        # print(int(self.trainingSize * self.samplesize))
+        XTrain_sampled = [XTrain[i] for i in list_of_random_index]
+        yTrain_sampled = [yTrain[i] for i in list_of_random_index]
+
+        assert len(list_of_random_index) == len(set(list_of_random_index)), "sampling is not uniform"
+
+        return XTrain_sampled, yTrain_sampled
+
+    def __call_cplex(self, A, y):
+        import cplex
+        no_features = -1
+        no_samples = len(y)
+        if(no_samples > 0):
+            no_features = len(A[0])
+        else:
+            print("- error: the dataset is corrupted, does not have sufficient samples")
+
+        if (self.verbose):
+            print("- no of features: ", no_features)
+            print("- no of samples : ", no_samples)
+
+        # Establish the Linear Programming Model
+        myProblem = cplex.Cplex()
+
+        feature_variable = []
+        variable_list = []
+        objective_coefficient = []
+        variable_count = 0
+
+        for eachLevel in range(self.numClause):
+            for i in range(no_features):
+                feature_variable.append(
+                    "b_" + str(i + 1) + str("_") + str(eachLevel + 1))
+
+        variable_list = variable_list + feature_variable
+
+        slack_variable = []
+        for i in range(no_samples):
+            slack_variable.append("s_" + str(i + 1))
+
+        variable_list = variable_list + slack_variable
+
+        if (self.learn_eta_clause):
+            variable_list.append("eta_clause")
+
+        if (self.learn_eta_literal):
+            # consider different threshold when learning mode is on
+            for eachLevel in range(self.numClause):
+                variable_list.append("eta_clit_"+str(eachLevel))
+
+        for i in range(len(y)):
+            for eachLevel in range(self.numClause):
+                variable_list.append("ax_" + str(i + 1) +
+                                     str("_") + str(eachLevel + 1))
+
+        myProblem.variables.add(names=variable_list)
+
+        # encode the objective function:
+
+        if(self.verbose):
+            print("- weight feature: ", self.weightFeature)
+            print("- weight error:   ", self.dataFidelity)
+
+        if(self.iterations == 1 or len(self.__assignList) == 0):  # is called in the first iteration
+            for eachLevel in range(self.numClause):
+                for i in range(no_features):
+                    objective_coefficient.append(self.weightFeature)
+                    myProblem.variables.set_lower_bounds(variable_count, 0)
+                    myProblem.variables.set_upper_bounds(variable_count, 1)
+                    myProblem.variables.set_types(
+                        variable_count, myProblem.variables.type.continuous)
+                    myProblem.objective.set_linear(
+                        [(variable_count, objective_coefficient[variable_count])])
+                    variable_count += 1
+        else:
+            for eachLevel in range(self.numClause):
+                for i in range(no_features):
+                    if (self.__assignList[eachLevel * no_features + i] > 0):
+                        objective_coefficient.append(-self.weightFeature)
+                    else:
+                        objective_coefficient.append(self.weightFeature)
+
+                    myProblem.variables.set_lower_bounds(variable_count, 0)
+                    myProblem.variables.set_upper_bounds(variable_count, 1)
+                    myProblem.variables.set_types(variable_count, myProblem.variables.type.continuous)
+                    myProblem.objective.set_linear([(variable_count, objective_coefficient[variable_count])])
+                    variable_count += 1
+
+        # slack_variable = []
+        for i in range(no_samples):
+            objective_coefficient.append(self.dataFidelity)
+            myProblem.variables.set_types(
+                variable_count, myProblem.variables.type.continuous)
+            myProblem.variables.set_lower_bounds(variable_count, 0)
+            myProblem.variables.set_upper_bounds(variable_count, 1)
+            myProblem.objective.set_linear(
+                [(variable_count, objective_coefficient[variable_count])])
+            variable_count += 1
+
+        myProblem.objective.set_sense(myProblem.objective.sense.minimize)
+
+        var_eta_clause = -1
+
+        if (self.learn_eta_clause):
+            myProblem.variables.set_types(
+                variable_count, myProblem.variables.type.integer)
+            myProblem.variables.set_lower_bounds(variable_count, 0)
+            myProblem.variables.set_upper_bounds(variable_count, self.numClause)
+            var_eta_clause = variable_count
+            variable_count += 1
+
+        var_eta_literal = [-1 for eachLevel in range(self.numClause)]
+        constraint_count = 0
+
+        if (self.learn_eta_literal):
+
+            for eachLevel in range(self.numClause):
+                myProblem.variables.set_types(
+                    variable_count, myProblem.variables.type.integer)
+                myProblem.variables.set_lower_bounds(variable_count, 0)
+                myProblem.variables.set_upper_bounds(variable_count, no_features)
+                var_eta_literal[eachLevel] = variable_count
+                variable_count += 1
+
+                constraint = []
+
+                for j in range(no_features):
+                    constraint.append(1)
+
+                constraint.append(-1)
+
+                myProblem.linear_constraints.add(
+                    lin_expr=[
+                        cplex.SparsePair(ind=[eachLevel * no_features + j for j in range(no_features)] + [var_eta_literal[eachLevel]],
+                                         val=constraint)],
+                    rhs=[0],
+                    names=["c" + str(constraint_count)],
+                    senses=["G"]
+                )
+                constraint_count += 1
+
+        for i in range(len(y)):
+            if (y[i] == 1):
+
+                auxiliary_index = []
+
+                for eachLevel in range(self.numClause):
+                    constraint = [int(feature) for feature in A[i]]
+
+                    myProblem.variables.set_types(
+                        variable_count, myProblem.variables.type.integer)
+                    myProblem.variables.set_lower_bounds(variable_count, 0)
+                    myProblem.variables.set_upper_bounds(variable_count, 1)
+
+                    constraint.append(no_features)
+
+                    auxiliary_index.append(variable_count)
+
+                    if (self.learn_eta_literal):
+
+                        constraint.append(-1)
+
+                        myProblem.linear_constraints.add(
+                            lin_expr=[cplex.SparsePair(
+                                ind=[eachLevel * no_features + j for j in range(no_features)] + [variable_count,
+                                                                                                 var_eta_literal[eachLevel]],
+                                val=constraint)],
+                            rhs=[0],
+                            names=["c" + str(constraint_count)],
+                            senses=["G"]
+                        )
+
+                        constraint_count += 1
+
+                    else:
+
+                        myProblem.linear_constraints.add(
+                            lin_expr=[cplex.SparsePair(
+                                ind=[eachLevel * no_features +
+                                     j for j in range(no_features)] + [variable_count],
+                                val=constraint)],
+                            rhs=[self.threshold_literal],
+                            names=["c" + str(constraint_count)],
+                            senses=["G"]
+                        )
+
+                        constraint_count += 1
+
+                    variable_count += 1
+
+                if (self.learn_eta_clause):
+
+                    myProblem.linear_constraints.add(
+                        lin_expr=[cplex.SparsePair(
+                            ind=[i + self.numClause * no_features,
+                                 var_eta_clause] + auxiliary_index,
+                            # 1st slack variable = level * no_features
+                            val=[self.numClause, -1] + [-1 for j in range(self.numClause)])],
+                        rhs=[- self.numClause],
+                        names=["c" + str(constraint_count)],
+                        senses=["G"]
+                    )
+
+                    constraint_count += 1
+
+                else:
+
+                    myProblem.linear_constraints.add(
+                        lin_expr=[cplex.SparsePair(
+                            # 1st slack variable = level * no_features
+                            ind=[i + self.numClause * no_features] + auxiliary_index,
+                            val=[self.numClause] + [-1 for j in range(self.numClause)])],
+                        rhs=[- self.numClause + self.threshold_clause],
+                        names=["c" + str(constraint_count)],
+                        senses=["G"]
+                    )
+
+                    constraint_count += 1
+
+            else:
+
+                auxiliary_index = []
+
+                for eachLevel in range(self.numClause):
+                    constraint = [int(feature) for feature in A[i]]
+                    myProblem.variables.set_types(
+                        variable_count, myProblem.variables.type.integer)
+                    myProblem.variables.set_lower_bounds(variable_count, 0)
+                    myProblem.variables.set_upper_bounds(variable_count, 1)
+
+                    constraint.append(- no_features)
+
+                    auxiliary_index.append(variable_count)
+
+                    if (self.learn_eta_literal):
+
+                        constraint.append(-1)
+
+                        myProblem.linear_constraints.add(
+                            lin_expr=[cplex.SparsePair(
+                                ind=[eachLevel * no_features + j for j in range(no_features)] + [variable_count,
+                                                                                                 var_eta_literal[eachLevel]],
+                                val=constraint)],
+                            rhs=[-1],
+                            names=["c" + str(constraint_count)],
+                            senses=["L"]
+                        )
+
+                        constraint_count += 1
+                    else:
+
+                        myProblem.linear_constraints.add(
+                            lin_expr=[cplex.SparsePair(
+                                ind=[eachLevel * no_features +
+                                     j for j in range(no_features)] + [variable_count],
+                                val=constraint)],
+                            rhs=[self.threshold_literal - 1],
+                            names=["c" + str(constraint_count)],
+                            senses=["L"]
+                        )
+
+                        constraint_count += 1
+
+                    variable_count += 1
+
+                if (self.learn_eta_clause):
+
+                    myProblem.linear_constraints.add(
+                        lin_expr=[cplex.SparsePair(
+                            ind=[i + self.numClause * no_features,
+                                 var_eta_clause] + auxiliary_index,
+                            # 1st slack variable = level * no_features
+                            val=[self.numClause, 1] + [-1 for j in range(self.numClause)])],
+                        rhs=[1],
+                        names=["c" + str(constraint_count)],
+                        senses=["G"]
+                    )
+
+                    constraint_count += 1
+
+                else:
+
+                    myProblem.linear_constraints.add(
+                        lin_expr=[cplex.SparsePair(
+                            # 1st slack variable = level * no_features
+                            ind=[i + self.numClause * no_features] + auxiliary_index,
+                            val=[self.numClause] + [-1 for j in range(self.numClause)])],
+                        rhs=[- self.threshold_clause + 1],
+                        names=["c" + str(constraint_count)],
+                        senses=["G"]
+                    )
+
+                    constraint_count += 1
+
+        # set parameters
+        if(self.verbose):
+            print("- timelimit: ",  self.timeOut/self.iterations)
+        myProblem.parameters.clocktype.set(1)  # cpu time (exact time)
+        myProblem.parameters.timelimit.set(self.timeOut/self.iterations)
+        myProblem.parameters.workmem.set(self.memlimit)
+        myProblem.set_log_stream(None)
+        myProblem.set_error_stream(None)
+        myProblem.set_warning_stream(None)
+        myProblem.set_results_stream(None)
+        # myProblem.parameters.mip.tolerances.mipgap.set(0.2)
+        myProblem.parameters.mip.limits.treememory.set(self.memlimit)
+        myProblem.parameters.workdir.set(self.workDir)
+        myProblem.parameters.mip.strategy.file.set(2)
+        myProblem.parameters.threads.set(1)
+
+        # Solve the model and print the answer
+        start_time = myProblem.get_time()
+        start_det_time = myProblem.get_dettime()
+        myProblem.solve()
+        # solution.get_status() returns an integer code
+        status = myProblem.solution.get_status()
+
+        end_det_time = myProblem.get_dettime()
+
+        end_time = myProblem.get_time()
+        if (self.verbose):
+            print("- Total solve time (sec.):", end_time - start_time)
+            print("- Total solve dettime (sec.):", end_det_time - start_det_time)
+
+            print("- Solution status = ", myProblem.solution.status[status])
+            print("- Objective value = ", myProblem.solution.get_objective_value())
+            print("- mip relative gap (should be zero):", myProblem.solution.MIP.get_mip_relative_gap())
+
+        #  retrieve solution: do rounding
+
+        self.__assignList = []
+
+        # if(self.verbose):
+        #     print(" - selected feature index")
+        for i in range(len(feature_variable)):
+            if(myProblem.solution.get_values(feature_variable[i]) > 0):
+                self.__assignList.append(1)
+            else:
+                self.__assignList.append(0)
+        # self.__assignList.append(myProblem.solution.get_values(feature_variable[i]))
+
+        for i in range(len(slack_variable)):
+            self.__assignList.append(myProblem.solution.get_values(slack_variable[i]))
+
+        # update parameters
+        if (self.learn_eta_clause and self.learn_eta_literal):
+
+            self.threshold_literal_learned = [int(myProblem.solution.get_values(var_eta_literal[eachLevel])) for eachLevel in range(self.numClause)]
+            self.threshold_clause_learned = int(myProblem.solution.get_values(var_eta_clause))
+
+        elif (self.learn_eta_clause):
+            self.threshold_literal_learned = [self.threshold_literal for eachLevel in range(self.numClause)]
+            self.threshold_clause_learned = int(myProblem.solution.get_values(var_eta_clause))
+
+        elif (self.learn_eta_literal):
+            self.threshold_literal_learned = [int(myProblem.solution.get_values(var_eta_literal[eachLevel])) for eachLevel in range(self.numClause)]
+            self.threshold_clause_learned = self.threshold_clause
+
+        if(self.verbose):
+            print("- cplex returned the solution")
