@@ -12,7 +12,7 @@ setup(
   packages = ['rulelearning'],
   version = 'v1.10',
   license='MIT',
-  description = 'This library can be used to generate interpretable classification rules expressed as CNF/DNF',
+  description = 'This library can be used to generate interpretable classification rules expressed as CNF/DNF and relaxed_CNF',
   long_description=long_description,
   long_description_content_type='text/markdown',
   author = 'Bishwamittra Ghosh',
