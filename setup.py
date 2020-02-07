@@ -10,7 +10,7 @@ with open(path.join(this_directory, 'README.md'), encoding='utf-8') as f:
 setup(
   name = 'rulelearning',
   packages = ['rulelearning'],
-  version = 'v1.10',
+  version = 'v1.0.0',
   license='MIT',
   description = 'This library can be used to generate interpretable classification rules expressed as CNF/DNF and relaxed_CNF',
   long_description=long_description,
