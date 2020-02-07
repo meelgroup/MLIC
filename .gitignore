@@ -11,3 +11,4 @@
 *.xml
 dist/*
 rulelearning.egg-info/*
+.vscode/*
