@@ -1,3 +1,7 @@
+
+
+# Contact: Bishwamittra Ghosh [email: bghosh@u.nus.edu]
+
 import numpy as np
 import pandas as pd
 import warnings
@@ -9,9 +13,9 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 
 
 class imli():
-    def __init__(self, iterations=-1, numClause=1, dataFidelity=10, weightFeature=1, threshold_literal=-1, threshold_clause=-1,
-                 solver="open-wbo", ruleType="CNF", samplesize=0.5,
-                 workDir=".", timeOut=1024, verbose=False):
+    def __init__(self, iterations=-1, num_clause=1, data_fidelity=10, weight_feature=1, threshold_literal=-1, threshold_clause=-1,
+                 solver="open-wbo", rule_type="CNF", samplesize=0.5,
+                 work_dir=".", time_out=1024, verbose=False):
         '''
 
         :param numBatch: no of Batchs of training dataset
@@ -26,25 +30,33 @@ class imli():
         --- more are added later
 
         '''
+
+        
         self.iterations = iterations
-        self.numClause = numClause
-        self.dataFidelity = dataFidelity
-        self.weightFeature = weightFeature
+        self.numClause = num_clause
+        self.dataFidelity = data_fidelity
+        self.weightFeature = weight_feature
         self.solver = solver
-        self.ruleType = ruleType
-        self.workDir = workDir
+        self.ruleType = rule_type
+        self.workDir = work_dir
         self.verbose = verbose
         self.__selectedFeatureIndex = []
-        self.timeOut = timeOut
+        self.timeOut = time_out
         self.memlimit = 1000*16
         self.__isFrequencyBasedDiscretization = False
-        self.learn_eta_literal = False
-        self.learn_eta_clause = False
+        self.learn_threshold_literal = False
+        self.learn_threshold_clause = False
         self.threshold_literal = threshold_literal
         self.threshold_clause = threshold_clause
 
-        if(self.ruleType == "checklist"):
-            self.solver = "cplex"  # this is the default solver for learning rules in checklists
+
+        if(self.ruleType!="CNF"  and self.ruleType!="DNF" and self.ruleType!="relaxed_CNF"):
+            print("\nError rule type. Choices are [CNF, DNF, relaxed_CNF]")
+            return
+
+
+        if(self.ruleType == "relaxed_CNF"):
+            self.solver = "cplex"  # this is the default solver for learning rules in relaxed_CNFs
             self.samplesize = samplesize
 
     def discretize_orange(self, csv_file):
@@ -92,7 +104,7 @@ class imli():
         print("\n\nIMLI:->")
         return '\n'.join(" - %s: %s" % (item, value) for (item, value) in vars(self).items() if "__" not in item)
 
-    def getSelectedColumnIndex(self):
+    def get_selected_column_index(self):
         return_list = [[] for i in range(self.numClause)]
         ySize = self.numFeatures
         for elem in self.__selectedFeatureIndex:
@@ -100,48 +112,69 @@ class imli():
             return_list[int(new_index/ySize)].append(new_index % ySize)
         return return_list
 
-    def getNumOfBatch(self):
+    def get_num_of_iterations(self):
         return self.iterations
 
-    def getNumOfClause(self):
+    def get_num_of_clause(self):
         return self.numClause
 
-    def getWeightFeature(self):
+    def get_weight_feature(self):
         return self.weightFeature
 
-    def getRuleType(self):
+    def get_rule_type(self):
         return self.ruleType
 
-    def getWorkDir(self):
+    def get_work_dir(self):
         return self.workDir
 
-    def getWeightDataFidelity(self):
+    def get_weight_data_fidelity(self):
         return self.dataFidelity
 
-    def getSolver(self):
+    def get_solver(self):
         return self.solver
 
-    def discretize(self, file, categoricalColumnIndex=[], columnSeperator=",", fracPresent=0.9, numThreshold=4):
+    def get_threshold_literal(self):
+        if(self.ruleType=="relaxed_CNF"):
+            return self.threshold_literal_learned
+        elif(self.ruleType=="CNF"):
+            return [1 for i in range(self.numClause)]
+        elif(self.ruleType=="DNF"):
+            return [len(selected_columns) for selected_columns in self.get_selected_column_index()]
+        else:
+            return
+
+    def get_threshold_clause(self):
+        if(self.ruleType=="relaxed_CNF"):
+            return self.threshold_clause_learned
+        elif(self.ruleType=="CNF"):
+            return self.numClause
+        elif(self.ruleType=="DNF"):
+            return 1
+        else:
+            return
+
+
+    def discretize(self, file, categorical_column_index=[], column_seperator=",", frac_present=0.9, num_thresholds=4):
 
         # Quantile probabilities
-        quantProb = np.linspace(1. / (numThreshold + 1.), numThreshold / (numThreshold + 1.), numThreshold)
+        quantProb = np.linspace(1. / (num_thresholds + 1.), num_thresholds / (num_thresholds + 1.), num_thresholds)
         # List of categorical columns
-        if type(categoricalColumnIndex) is pd.Series:
-            categoricalColumnIndex = categoricalColumnIndex.tolist()
-        elif type(categoricalColumnIndex) is not list:
-            categoricalColumnIndex = [categoricalColumnIndex]
-        data = pd.read_csv(file, sep=columnSeperator, header=0, error_bad_lines=False)
+        if type(categorical_column_index) is pd.Series:
+            categorical_column_index = categorical_column_index.tolist()
+        elif type(categorical_column_index) is not list:
+            categorical_column_index = [categorical_column_index]
+        data = pd.read_csv(file, sep=column_seperator, header=0, error_bad_lines=False)
 
         columns = data.columns
-        # if (self.verbose):
+        # if (self.verbose):˚
         #     print(data)
         #     print(columns)
-        #     print(categoricalColumnIndex)
+        #     print(categorical_column_index)
         if (self.verbose):
             print("\n\nApplying quantile based discretization")
             print("- file name: ", file)
-            print("- categorical features index: ", categoricalColumnIndex)
-            print("- number of bins: ", numThreshold)
+            print("- categorical features index: ", categorical_column_index)
+            print("- number of bins: ", num_thresholds)
             # print("- features: ", columns)
             print("- number of features:", len(columns))
 
@@ -150,7 +183,7 @@ class imli():
 
         columnY = columns[-1]
 
-        data.dropna(axis=1, thresh=fracPresent * len(data), inplace=True)
+        data.dropna(axis=1, thresh=frac_present * len(data), inplace=True)
         data.dropna(axis=0, how='any', inplace=True)
 
         y = data.pop(columnY).copy()
@@ -181,10 +214,10 @@ class imli():
                 column_counter += 2
 
             # Categorical column
-            elif (count in categoricalColumnIndex) or (data[c].dtype == 'object'):
+            elif (count in categorical_column_index) or (data[c].dtype == 'object'):
                 # if (self.verbose):
                 #     print(c)
-                #     print(c in categoricalColumnIndex)
+                #     print(c in categorical_column_index)
                 #     print(data[c].dtype)
                 # Dummy-code values
                 Anew = pd.get_dummies(data[c]).astype(int)
@@ -203,7 +236,7 @@ class imli():
                 # Few unique values
                 # if (self.verbose):
                 #     print(data[c].dtype)
-                if valUniq <= numThreshold + 1:
+                if valUniq <= num_thresholds + 1:
                     # Thresholds are sorted unique values excluding maximum
                     thresh[c] = np.sort(data[c].unique())[:-1]
                 # Many unique values
@@ -241,13 +274,13 @@ class imli():
             print("- number of discretized features: ", len(X.columns))
         return X.as_matrix(), y.values.ravel(), X.columns
 
-    def __fit_checklist(self, XTrain, yTrain):
+    def __fit_relaxed_CNF(self, XTrain, yTrain):
 
         
         if (self.threshold_clause == -1):
-            self.learn_eta_clause = True
+            self.learn_threshold_clause = True
         if (self.threshold_literal == -1):
-            self.learn_eta_literal = True
+            self.learn_threshold_literal = True
 
         if(self.iterations==-1): # when not specified
             self.iterations = int(math.ceil(1/self.samplesize))
@@ -290,17 +323,24 @@ class imli():
 
     def fit(self, XTrain, yTrain):
 
-        if(self.ruleType == "checklist"):
-            self.__fit_checklist(XTrain, yTrain)
+        if(self.ruleType!="CNF"  and self.ruleType!="DNF" and self.ruleType!="relaxed_CNF"):
+            print("\n\nError rule type. Choices are [CNF, DNF, relaxed_CNF]")
+            return
+
+        self.trainingSize = len(XTrain)
+        if(self.trainingSize > 0):
+            self.numFeatures = len(XTrain[0])
+
+
+        if(self.ruleType == "relaxed_CNF"):
+            self.__fit_relaxed_CNF(XTrain, yTrain)
             return
 
         if(self.iterations == -1):
             self.iterations = 2**math.floor(math.log2(len(XTrain)/32))
             # print("Batchs:" + str(self.iterations))
 
-        self.trainingSize = len(XTrain)
-        if(self.trainingSize > 0):
-            self.numFeatures = len(XTrain[0])
+        
 
         XTrains, yTrains = self.__getBatchWithEqualProbability(XTrain, yTrain)
 
@@ -312,7 +352,7 @@ class imli():
 
     def predict(self, XTest, yTest):
 
-        if(self.ruleType == "checklist"):
+        if(self.ruleType == "relaxed_CNF"):
             y_hat = []
             for i in range(len(yTest)):
                 dot_value = [0 for eachLevel in range(self.numClause)]
@@ -365,10 +405,12 @@ class imli():
                                     len(X[0]), WCNFFile,
                                     isTest)
 
-        else:
+        elif(self.ruleType == "CNF"):
             self.__generateWcnfFile(X, y, len(X[0]),
                                     WCNFFile,
                                     isTest)
+        else:
+            print("\n\nError rule type")
 
         # call a maxsat solver
         if(self.solver == "open-wbo" or "maxhs"):  # solver has timeout and experimented with open-wbo only
@@ -440,6 +482,8 @@ class imli():
         if (not isTest):
             self.__assignList = fields[:self.numClause * len(X[0])]
             self.__selectedFeatureIndex = TrueRules
+
+            # print(self.__selectedFeatureIndex)
 
         return fields[self.numClause * len(X[0]):len(y) + self.numClause * len(X[0])]
 
@@ -642,9 +686,9 @@ class imli():
             print("- number of Boolean variables:", additionalVariable + xSize * self.numClause + (len(yVector)))
             print("- number of hard and soft clauses:", numClauses)
 
-    def getRule(self, features):
+    def get_rule(self, features):
 
-        if(self.ruleType == "checklist"):  # naive copy paste
+        if(self.ruleType == "relaxed_CNF"):  # naive copy paste
             no_features = len(features)
             # self.rule_size = 0
             rule = '[ ( '
@@ -757,10 +801,10 @@ class imli():
 
         variable_list = variable_list + slack_variable
 
-        if (self.learn_eta_clause):
+        if (self.learn_threshold_clause):
             variable_list.append("eta_clause")
 
-        if (self.learn_eta_literal):
+        if (self.learn_threshold_literal):
             # consider different threshold when learning mode is on
             for eachLevel in range(self.numClause):
                 variable_list.append("eta_clit_"+str(eachLevel))
@@ -818,7 +862,7 @@ class imli():
 
         var_eta_clause = -1
 
-        if (self.learn_eta_clause):
+        if (self.learn_threshold_clause):
             myProblem.variables.set_types(
                 variable_count, myProblem.variables.type.integer)
             myProblem.variables.set_lower_bounds(variable_count, 0)
@@ -829,7 +873,7 @@ class imli():
         var_eta_literal = [-1 for eachLevel in range(self.numClause)]
         constraint_count = 0
 
-        if (self.learn_eta_literal):
+        if (self.learn_threshold_literal):
 
             for eachLevel in range(self.numClause):
                 myProblem.variables.set_types(
@@ -873,7 +917,7 @@ class imli():
 
                     auxiliary_index.append(variable_count)
 
-                    if (self.learn_eta_literal):
+                    if (self.learn_threshold_literal):
 
                         constraint.append(-1)
 
@@ -905,7 +949,7 @@ class imli():
 
                     variable_count += 1
 
-                if (self.learn_eta_clause):
+                if (self.learn_threshold_clause):
 
                     myProblem.linear_constraints.add(
                         lin_expr=[cplex.SparsePair(
@@ -949,7 +993,7 @@ class imli():
 
                     auxiliary_index.append(variable_count)
 
-                    if (self.learn_eta_literal):
+                    if (self.learn_threshold_literal):
 
                         constraint.append(-1)
 
@@ -980,7 +1024,7 @@ class imli():
 
                     variable_count += 1
 
-                if (self.learn_eta_clause):
+                if (self.learn_threshold_clause):
 
                     myProblem.linear_constraints.add(
                         lin_expr=[cplex.SparsePair(
@@ -1046,30 +1090,34 @@ class imli():
         #  retrieve solution: do rounding
 
         self.__assignList = []
-
+        self.__selectedFeatureIndex = []
         # if(self.verbose):
         #     print(" - selected feature index")
         for i in range(len(feature_variable)):
             if(myProblem.solution.get_values(feature_variable[i]) > 0):
                 self.__assignList.append(1)
+                self.__selectedFeatureIndex.append(i+1)
             else:
                 self.__assignList.append(0)
+                # self.__selectedFeatureIndex.append(i+1)
+        # print(self.__selectedFeatureIndex)
+        
         # self.__assignList.append(myProblem.solution.get_values(feature_variable[i]))
 
         for i in range(len(slack_variable)):
             self.__assignList.append(myProblem.solution.get_values(slack_variable[i]))
 
         # update parameters
-        if (self.learn_eta_clause and self.learn_eta_literal):
+        if (self.learn_threshold_clause and self.learn_threshold_literal):
 
             self.threshold_literal_learned = [int(myProblem.solution.get_values(var_eta_literal[eachLevel])) for eachLevel in range(self.numClause)]
             self.threshold_clause_learned = int(myProblem.solution.get_values(var_eta_clause))
 
-        elif (self.learn_eta_clause):
+        elif (self.learn_threshold_clause):
             self.threshold_literal_learned = [self.threshold_literal for eachLevel in range(self.numClause)]
             self.threshold_clause_learned = int(myProblem.solution.get_values(var_eta_clause))
 
-        elif (self.learn_eta_literal):
+        elif (self.learn_threshold_literal):
             self.threshold_literal_learned = [int(myProblem.solution.get_values(var_eta_literal[eachLevel])) for eachLevel in range(self.numClause)]
             self.threshold_clause_learned = self.threshold_clause
 
