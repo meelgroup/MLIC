@@ -1,3 +1,5 @@
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 # IMLI
 
 IMLI is an interpretable classification rule learning framework based on incremental mini-batch learning setting.  This tool can be used to learn classification rules expressible in propositional logic, in particular, in [CNF, DNF](https://bishwamittra.github.io/publication/imli-ghosh.pdf), and [relaxed CNF](https://bishwamittra.github.io/publication/ecai_2020/paper.pdf).   
