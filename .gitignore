@@ -12,3 +12,4 @@
 dist/*
 rulelearning.egg-info/*
 .vscode/*
+*/__pycache__/*

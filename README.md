@@ -18,12 +18,12 @@ In the `rulelearning` directory, we have added `imli.py` which is the incrementa
 <!-- To run `imli.py`, you will need an off the self MaxSAT solver (e.g., Open-Wbo) to be in the PATH variable. -->
 To learn CNF/DNF rules, one would require an off-the-shelf MaxSAT solver (default is open-wbo) to be installed and added to the PATH variable. To learn relaxed CNF rules, one would require a linear programming solver (default is CPLEX)  to be installed. 
 
-## PIP Install
+<!-- ## PIP Install
 Run the following command to install the python library.
 
 ```
 pip install rulelearning
-```
+``` -->
 
 ## Install MaxSAT solvers
 
@@ -38,14 +38,18 @@ Other off-the-shelf MaxSAT solvers can also be used for this framework.
 
 To install the linear programming solver, i.e., CPLEX, download and install it from [IBM](https://www.ibm.com/support/pages/downloading-ibm-ilog-cplex-optimization-studio-v1290).  To setup the Python API of CPLEX, follow the instructions from [here](https://www.ibm.com/support/knowledgecenter/SSSA5P_12.7.0/ilog.odms.cplex.help/CPLEX/GettingStarted/topics/set_up/Python_setup.html).
 
+## Install Orange3
+
+IMLI incorporates entropy-based discretization based on Orange3 library. Follow the instructions in the [Github](https://github.com/biolab/orange3) repository to install Orange3. 
+
 ## Usage
 
-Import the Python library.
+Import the directory of Python scripts.
 ```
 import rulelearning
 ```
 
-Call an instance of `imli` object. Specify the parameters in `imli()`. For example, in order to  learn CNF rules, set `rule_type="CNF"`. Similarly to learn relaxed CNF rules, set `rule_type="relaxed_CNF"`.
+Call an instance of `imli` object and specify the parameters in `imli()`. For example, in order to  learn CNF rules, set `rule_type="CNF"`. Similarly to learn relaxed CNF rules, set `rule_type="relaxed_CNF"`.
 ```
 model=rulelearning.imli()
 ```
