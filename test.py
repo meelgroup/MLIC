@@ -1,9 +1,9 @@
 
 # for testing
 
-import rulelearning
-model=rulelearning.imli(verbose=False, solver="maxhs", num_clause=2, data_fidelity=20, rule_type="relaxed_CNF")
-X, y, features = model.discretize("benchmarks/iris.csv")
+from rulelearning import imli
+model=imli.imli(verbose=False, solver="maxhs", num_clause=2, data_fidelity=20, rule_type="CNF")
+X, y, features = model.discretize_orange("benchmarks/iris_orange.csv")
 model.fit(X,y)
 rule = model.get_rule(features)
 print(rule)

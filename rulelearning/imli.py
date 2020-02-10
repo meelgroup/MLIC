@@ -75,9 +75,13 @@ class imli():
         # Apply one hot encoding on X (Using continuizer of Orange)
         continuizer = Orange.preprocess.Continuize()
         binarized_data = continuizer(discetized_data)
-        # self.columns = [binarized_data.domain[i].name for i in range(
-        #     len(binarized_data.domain)-1)]
-        # print(self.columns)
+        
+        # make another level of binarization
+        X=[]
+        for sample in binarized_data.X:
+            X.append([int(feature) for feature in sample]+ [int(1-feature) for feature in sample])
+    
+
         columns = []
         for i in range(len(binarized_data.domain)-1):
             column = binarized_data.domain[i].name
@@ -94,11 +98,20 @@ class imli():
                     column = column
             columns.append(column)
         # print(self.columns)
+
+        # make negated columns
+        num_features=len(columns)
+        for index in range(num_features):
+            columns.append("not_"+columns[index])
+        # print(self.columns)
+    
+
         if(self.verbose):
             print("Applying frequency based discretization using Orange library")
             print("- file name: ", csv_file)
             print("- the number of discretized features:", len(columns))
-        return binarized_data.X, binarized_data.Y,  columns
+
+        return np.array(X), np.array([int(value) for value in binarized_data.Y]),  columns
 
     def __repr__(self):
         print("\n\nIMLI:->")

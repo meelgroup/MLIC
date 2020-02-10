@@ -44,14 +44,14 @@ IMLI incorporates entropy-based discretization based on Orange3 library. Follow 
 
 ## Usage
 
-Import the directory of Python scripts.
+Import the Python scripts.
 ```
-import rulelearning
+from rulelearning import imli
 ```
 
 Call an instance of `imli` object and specify the parameters in `imli()`. For example, in order to  learn CNF rules, set `rule_type="CNF"`. Similarly to learn relaxed CNF rules, set `rule_type="relaxed_CNF"`.
 ```
-model=rulelearning.imli()
+model=imli.imli()
 ```
 Discretize the dataset in the csv format using the following command. `benchmarks/` contains  a set of sample datasets.
 ```
