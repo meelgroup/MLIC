@@ -44,9 +44,11 @@ IMLI incorporates entropy-based discretization based on Orange3 library. Follow 
 
 ## Usage
 
-Import the Python scripts.
+### See the documentation in the [notebook](documentation.ipynb).
+
+Import the Python scripts from the directory `rulelearning`.
 ```
-from rulelearning import imli
+import imli
 ```
 
 Call an instance of `imli` object and specify the parameters in `imli()`. For example, in order to  learn CNF rules, set `rule_type="CNF"`. Similarly to learn relaxed CNF rules, set `rule_type="relaxed_CNF"`.
@@ -88,9 +90,14 @@ Please click on "issues" at the top and [create a new issue](https://github.com/
 ## Contact
 [Bishwamittra Ghosh](https://bishwamittra.github.io/) (bghosh@u.nus.edu)
 
-## How to cite
+## Citations
 
-Please cite the following two papers.
+
+@inproceedings{GMM20,<br />
+author={Ghosh, Bishwamittra and Malioutov, Dmitry and  Meel, Kuldeep S.},<br />
+title={Classification Rules in Relaxed Logical Form},<br />
+booktitle={Proc. of ECAI},<br />
+year={2020},}
 
 @inproceedings{GM19,<br />
 author={Ghosh, Bishwamittra and  Meel, Kuldeep S.},<br />
@@ -98,11 +105,12 @@ title={{IMLI}: An Incremental Framework for MaxSAT-Based Learning of Interpretab
 booktitle={Proc. of AIES},<br />
 year={2019},}
 
-@inproceedings{GMM20,<br />
-author={Ghosh, Bishwamittra and Malioutov, Dmitry and  Meel, Kuldeep S.},<br />
-title={Classification Rules in Relaxed Logical Form},<br />
-booktitle={Proc. of ECAI},<br />
-year={2020},}
+@inproceedings{MM18,<br />
+author={Malioutov, Dmitry and  Meel, Kuldeep S.},<br />
+title={{MLIC}: A MaxSAT-Based framework for learning interpretable classification rules},<br />
+booktitle={Proceedings of International Conference on Constraint Programming (CP)},<br />
+month={08},<br />
+year={2018},}
 
 ## Old Versions
 The old version, MLIC (non-incremental framework) is available under the branch "MLIC". Please read the README of the old release to know how to compile the code. 

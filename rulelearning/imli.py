@@ -9,6 +9,7 @@ import math
 import os
 from sklearn.model_selection import train_test_split
 import random
+import subprocess
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
 
@@ -285,7 +286,7 @@ class imli():
         if(self.verbose):
             print("\n\nAfter applying discretization")
             print("- number of discretized features: ", len(X.columns))
-        return X.as_matrix(), y.values.ravel(), X.columns
+        return X.values, y.values.ravel(), X.columns
 
     def __fit_relaxed_CNF(self, XTrain, yTrain):
 
@@ -405,6 +406,10 @@ class imli():
                 yhat.append(yTest[i])
         return yhat
 
+    def _cmd_exists(self, cmd):
+        return subprocess.call("type " + cmd, shell=True, 
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE) == 0
+
     def __learnModel(self, X, y, isTest):
         # temp files to save maxsat query in wcnf format
         WCNFFile = self.workDir + "/" + "model.wcnf"
@@ -427,14 +432,17 @@ class imli():
 
         # call a maxsat solver
         if(self.solver == "open-wbo" or "maxhs"):  # solver has timeout and experimented with open-wbo only
-            if(self.iterations == -1):
-                cmd = self.solver + '   ' + WCNFFile + ' -cpu-lim=' + str(self.timeOut) + ' > ' + outputFileMaxsat
-            else:
-                if(int(math.ceil(self.timeOut/self.iterations)) < 1):  # give at lest 1 second as cpu-lim
-                    cmd = self.solver + '   ' + WCNFFile + ' -cpu-lim=' + str(1) + ' > ' + outputFileMaxsat
+            if(self._cmd_exists(self.solver)):
+                if(self.iterations == -1):
+                    cmd = self.solver + '   ' + WCNFFile + ' -cpu-lim=' + str(self.timeOut) + ' > ' + outputFileMaxsat
                 else:
-                    cmd = self.solver + '   ' + WCNFFile + ' -cpu-lim=' + str(int(math.ceil(self.timeOut/self.iterations))) + ' > ' + outputFileMaxsat
-                    # print(int(math.ceil(self.timeOut/self.iterations)))
+                    if(int(math.ceil(self.timeOut/self.iterations)) < 1):  # give at lest 1 second as cpu-lim
+                        cmd = self.solver + '   ' + WCNFFile + ' -cpu-lim=' + str(1) + ' > ' + outputFileMaxsat
+                    else:
+                        cmd = self.solver + '   ' + WCNFFile + ' -cpu-lim=' + str(int(math.ceil(self.timeOut/self.iterations))) + ' > ' + outputFileMaxsat
+                        # print(int(math.ceil(self.timeOut/self.iterations)))
+            else:
+                raise Exception("Solver not found")   
         else:
             cmd = self.solver + '   ' + WCNFFile + ' > ' + outputFileMaxsat
 
@@ -573,7 +581,7 @@ class imli():
                         Batch_list_X_train[int(math.pow(2, i)) + j - 1],
                         Batch_list_y_train[int(math.pow(2, i)) + j - 1],
                         test_size=0.5,
-                        random_state=None)  # random state for keeping consistency between lp and maxsat approach
+                        random_state = 22)  # random state for keeping consistency between lp and maxsat approach
                     Batch_list_X_train.append(A_train_1)
                     Batch_list_X_train.append(A_train_2)
                     Batch_list_y_train.append(y_train_1)
@@ -740,9 +748,9 @@ class imli():
             else:
                 str_clauses = [' '.join(features[ind]) for ind in inds_nnz]
             if (self.ruleType == "CNF"):
-                rule_sep = ' %s ' % "or"
+                rule_sep = ' %s ' % "OR"
             else:
-                rule_sep = ' %s ' % "and"
+                rule_sep = ' %s ' % "AND"
             rule_str = rule_sep.join(str_clauses)
             if (self.ruleType == 'DNF'):
                 rule_str = rule_str.replace('<=', '??').replace('>', '<=').replace('??', '>')
@@ -752,9 +760,9 @@ class imli():
             generatedRule += rule_str
             if (i < self.numClause - 1):
                 if (self.ruleType == "DNF"):
-                    generatedRule += ' ) or \n( '
+                    generatedRule += ' ) OR \n( '
                 if (self.ruleType == 'CNF'):
-                    generatedRule += ' ) and \n( '
+                    generatedRule += ' ) AND \n( '
         generatedRule += ')'
 
         if(self.__isFrequencyBasedDiscretization):
