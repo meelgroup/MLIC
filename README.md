@@ -25,7 +25,12 @@ Run the following command to install the python library.
 pip install rulelearning
 ``` -->
 
-## Install MaxSAT solvers
+## Install
+
+Run `pip install -r requirements.txt` to install all necessary python packages available from pip
+
+
+### Install MaxSAT solvers
 
 To install Open-wbo, follow the instructions from [here](http://sat.inesc-id.pt/open-wbo/).
 After the installation is complete, add the path of the binary to the PATH variable. 
@@ -34,13 +39,9 @@ export PATH=$PATH:'/path/to/open-wbo/'
 ```
 Other off-the-shelf MaxSAT solvers can also be used for this framework.
 
-## Install CPLEX
+### Install CPLEX
 
 To install the linear programming solver, i.e., CPLEX, download and install it from [IBM](https://www.ibm.com/support/pages/downloading-ibm-ilog-cplex-optimization-studio-v1290).  To setup the Python API of CPLEX, follow the instructions from [here](https://www.ibm.com/support/knowledgecenter/SSSA5P_12.7.0/ilog.odms.cplex.help/CPLEX/GettingStarted/topics/set_up/Python_setup.html).
-
-## Install Orange3
-
-IMLI incorporates entropy-based discretization based on Orange3 library. Follow the instructions in the [Github](https://github.com/biolab/orange3) repository to install Orange3. 
 
 ## Usage
 
@@ -65,7 +66,7 @@ If the dataset contains categorical features, specify the index of such categori
 ```
 X, y, features = model.discretize("credit.csv",categorical_column_index=[2,3,4])
 ```
-`imli.discretize()` method applies quantile-based technique in the disretization process. To apply frequency-based discretization, alternately use the following command. For that, one would require to specify the feature-type in the input CSV file. For more details, follow the instructions in `benchmarks/` directory.
+`imli.discretize()` method applies quantile-based technique in the disretization process. To apply entropy-based discretization, alternately use the following command. For that, one would require to specify the feature-type in the input CSV file. For more details, follow the instructions in `benchmarks/` directory.
 ```
 X, y, features = model.discretize_orange("iris_orange.csv")
 ```

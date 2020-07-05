@@ -44,7 +44,7 @@ class imli():
         self.__selectedFeatureIndex = []
         self.timeOut = time_out
         self.memlimit = 1000*16
-        self.__isFrequencyBasedDiscretization = False
+        self.__isEntropyBasedDiscretization = False
         self.learn_threshold_literal = False
         self.learn_threshold_clause = False
         self.threshold_literal = threshold_literal
@@ -62,7 +62,7 @@ class imli():
 
     def discretize_orange(self, csv_file):
         import Orange
-        self.__isFrequencyBasedDiscretization = True
+        self.__isEntropyBasedDiscretization = True
         data = Orange.data.Table(csv_file)
         # Run impute operation for handling missing values
         imputer = Orange.preprocess.Impute()
@@ -108,7 +108,7 @@ class imli():
     
 
         if(self.verbose):
-            print("Applying frequency based discretization using Orange library")
+            print("Applying entropy based discretization using Orange library")
             print("- file name: ", csv_file)
             print("- the number of discretized features:", len(columns))
 
@@ -467,7 +467,7 @@ class imli():
         TrueErrors = []
         zeroOneSolution = []
 
-        if(not self.__isFrequencyBasedDiscretization):
+        if(not self.__isEntropyBasedDiscretization):
             fields = self.__pruneRules(fields, len(X[0]))
 
         for field in fields:
@@ -718,7 +718,7 @@ class imli():
                 for literal_index in range(no_features):
                     if (self.__assignList[eachLevel * no_features + literal_index] >= 1):
                         # rule += "  X_" + str(literal_index + 1) + "  +"
-                        if(self.__isFrequencyBasedDiscretization):
+                        if(self.__isEntropyBasedDiscretization):
                             rule += " " + features[literal_index] + "  +"
                         else:
                             rule += " " + ' '.join(features[literal_index]) + "  +"
@@ -730,7 +730,7 @@ class imli():
                     rule += ' +\n[ ( '
             rule += "  >= " + str(self.threshold_clause_learned)
 
-            if(self.__isFrequencyBasedDiscretization):
+            if(self.__isEntropyBasedDiscretization):
 
                 rule = rule.replace('_l_', ' < ')
                 rule = rule.replace('_ge_', ' >= ')
@@ -743,7 +743,7 @@ class imli():
             xHatElem = self.__xhat[i]
             inds_nnz = np.where(abs(xHatElem) > 1e-4)[0]
 
-            if(self.__isFrequencyBasedDiscretization):
+            if(self.__isEntropyBasedDiscretization):
                 str_clauses = [''.join(features[ind]) for ind in inds_nnz]
             else:
                 str_clauses = [' '.join(features[ind]) for ind in inds_nnz]
@@ -765,7 +765,7 @@ class imli():
                     generatedRule += ' ) AND \n( '
         generatedRule += ')'
 
-        if(self.__isFrequencyBasedDiscretization):
+        if(self.__isEntropyBasedDiscretization):
             generatedRule = generatedRule.replace('_l_', ' < ')
             generatedRule = generatedRule.replace('_ge_', ' >= ')
             generatedRule = generatedRule.replace('_eq_', ' = ')
