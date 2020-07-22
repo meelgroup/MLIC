@@ -49,6 +49,7 @@ class imli():
         self.learn_threshold_clause = False
         self.threshold_literal = threshold_literal
         self.threshold_clause = threshold_clause
+        self._imli__columnInfo = None
 
 
         if(self.ruleType!="CNF"  and self.ruleType!="DNF" and self.ruleType!="relaxed_CNF"):
@@ -467,7 +468,7 @@ class imli():
         TrueErrors = []
         zeroOneSolution = []
 
-        if(not self.__isEntropyBasedDiscretization):
+        if(not self.__isEntropyBasedDiscretization and self._imli__columnInfo is not None):
             fields = self.__pruneRules(fields, len(X[0]))
 
         for field in fields:
@@ -743,7 +744,7 @@ class imli():
             xHatElem = self.__xhat[i]
             inds_nnz = np.where(abs(xHatElem) > 1e-4)[0]
 
-            if(self.__isEntropyBasedDiscretization):
+            if(self.__isEntropyBasedDiscretization or self._imli__columnInfo is None):
                 str_clauses = [''.join(features[ind]) for ind in inds_nnz]
             else:
                 str_clauses = [' '.join(features[ind]) for ind in inds_nnz]
