@@ -13,3 +13,5 @@ dist/*
 pyrulelearn.egg-info/*
 .vscode/*
 */__pycache__/*
+build/*
+temp/*
