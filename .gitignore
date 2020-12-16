@@ -10,6 +10,6 @@
 *.iml
 *.xml
 dist/*
-rulelearning.egg-info/*
+pyrulelearn.egg-info/*
 .vscode/*
 */__pycache__/*

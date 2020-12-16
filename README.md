@@ -13,8 +13,8 @@ This tool  is based on our [AIES-2019](https://bishwamittra.github.io/publicatio
 
 The directory `benchmarks/` consists of all the benchmark files used for the experiment. 
 
-The directory `rulelearning` contains all the scripts that are employed in testing and required for reproducibility. 
-In the `rulelearning` directory, we have added `imli.py` which is the incremental learning framework for generating interpretable classification rules. 
+The directory `pyrulelearn` contains all the scripts that are employed in testing and required for reproducibility. 
+In the `pyrulelearn` directory, we have added `imli.py` which is the incremental learning framework for generating interpretable classification rules. 
 <!-- To run `imli.py`, you will need an off the self MaxSAT solver (e.g., Open-Wbo) to be in the PATH variable. -->
 To learn CNF/DNF rules, one would require an off-the-shelf MaxSAT solver (default is open-wbo) to be installed and added to the PATH variable. To learn relaxed CNF rules, one would require a linear programming solver (default is CPLEX)  to be installed. 
 
@@ -22,7 +22,7 @@ To learn CNF/DNF rules, one would require an off-the-shelf MaxSAT solver (defaul
 Run the following command to install the python library.
 
 ```
-pip install rulelearning
+pip install pyrulelearn
 ``` -->
 
 ## Install
@@ -47,7 +47,7 @@ To install the linear programming solver, i.e., CPLEX, download and install it f
 
 ### See the documentation in the [notebook](documentation.ipynb).
 
-Import the Python scripts from the directory `rulelearning`.
+Import the Python scripts from the directory `pyrulelearn`.
 ```
 import imli
 ```
