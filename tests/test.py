@@ -32,9 +32,9 @@ def measurement(cnf_matrix):
     ACC = (TP+TN)/(TP+FP+FN+TN)
     return TPR, TNR, PPV, NPV, FPR, FNR, FDR, ACC*100
 
-yhat_train = model.predict(X_train, y_train)
+yhat_train = model.predict(X_train)
 _, _, _, _, _, _, _, train_acc = measurement(confusion_matrix(y_train, yhat_train))
-yhat_test = model.predict(X_test, y_test)
+yhat_test = model.predict(X_test)
 _, _, _, _, _, _, _, test_acc = measurement(confusion_matrix(y_test, yhat_test))
 print("training    accuracy: ", train_acc)
 print("test        accuracy: ", test_acc)

@@ -365,7 +365,9 @@ class imli():
                 print("\nTraining started for batch: ", each_batch+1)
             self.__learnModel(XTrains[each_batch], yTrains[each_batch], isTest=False)
 
-    def predict(self, XTest, yTest):
+    def predict(self, XTest):
+
+        yTest = [0 for _ in XTest]
 
         if(self.ruleType == "relaxed_CNF"):
             y_hat = []
