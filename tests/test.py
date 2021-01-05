@@ -1,5 +1,5 @@
 from pyrulelearn.imli import imli as imli
-model = imli(rule_type="relaxed_CNF", num_clause=3, solver="open-wbo",  data_fidelity=10,  work_dir=".", verbose=True)
+model = imli(rule_type="CNF", num_clause=3, solver="open-wbo",  data_fidelity=5,  work_dir=".", verbose=True)
 X, y, features = model.discretize_orange("../benchmarks/iris_orange.csv")
 # split into train and test set
 from sklearn.model_selection import train_test_split

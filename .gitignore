@@ -16,3 +16,4 @@ pyrulelearn.egg-info/*
 build/*
 temp/*
 test.py
+data/*

@@ -367,7 +367,7 @@ class imli():
 
     def predict(self, XTest):
 
-        yTest = [0 for _ in XTest]
+        yTest = [1 for _ in XTest]
 
         if(self.ruleType == "relaxed_CNF"):
             y_hat = []
