@@ -134,12 +134,14 @@ class imli():
         for index_list in temp:
             each_level_index = []
             for index in index_list:
+                phase = 1
                 actual_feature_len = int(self.numFeatures/2)
                 if(self.ruleType == "DNF"):
                     index = index - actual_feature_len if index >= actual_feature_len else index + actual_feature_len
                 if(index >= actual_feature_len):
-                    index = -1 * (index - actual_feature_len)
-                each_level_index.append(index)
+                    index = index - actual_feature_len
+                    phase = -1
+                each_level_index.append((index, phase))
             result.append(each_level_index)
         
         return result
@@ -775,6 +777,7 @@ class imli():
     def get_rule(self, features):
 
         if(2 * len(features) == self.numFeatures):
+            features = [str(feature) for feature in features]
             features += ["not " + str(feature) for feature in features]
             
         assert len(features) == self.numFeatures
