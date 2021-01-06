@@ -13,10 +13,3 @@ This link contains two folders: `converted_for_orange_library` and `quantile_bas
 4. To ignore any feature, add `i#` to the feature name. 
 
 For more details, review the instructions from the Orange [documentation](https://docs.biolab.si//3/data-mining-library/reference/data.io.html).
-
-## Prepare datasets for  quantile-based discretization
-
-The datasets inside   `quantile_based_discretization` directory can be passed to `imli.discretization()` subroutine that applies quantile based discretization. The list of indices of the categorical features are passed as a parameter to `imli.discretization()`. For example, `quantile_based_discretization/credit.csv` contains categorial features and their indices are `[2,3,4]`.
-```
-X, y, features = model.discretize("credit.csv",categorical_column_index=[2,3,4])
-```

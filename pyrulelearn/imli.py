@@ -49,8 +49,7 @@ class imli():
         self.learn_threshold_clause = False
         self.threshold_literal = threshold_literal
         self.threshold_clause = threshold_clause
-        self._imli__columnInfo = None
-
+        
 
         if(self.ruleType!="CNF"  and self.ruleType!="DNF" and self.ruleType!="relaxed_CNF"):
             print("\nError rule type. Choices are [CNF, DNF, relaxed_CNF]")
@@ -78,34 +77,35 @@ class imli():
         continuizer = Orange.preprocess.Continuize()
         binarized_data = continuizer(discetized_data)
         
-        # make another level of binarization
         X=[]
-        for sample in binarized_data.X:
-            X.append([int(feature) for feature in sample]+ [int(1-feature) for feature in sample])
+        # # make another level of binarization
+        # for sample in binarized_data.X:
+        #     X.append([int(feature) for feature in sample]+ [int(1-feature) for feature in sample])
+        X = binarized_data.X
     
 
         columns = []
         for i in range(len(binarized_data.domain)-1):
             column = binarized_data.domain[i].name
             if("<" in column):
-                column = column.replace("=<", "_l_")
+                column = column.replace("=<", ' < ')
             elif("≥" in column):
-                column = column.replace("=≥", "_ge_")
+                column = column.replace("=≥", ' >= ')
             elif("=" in column):
                 if("-" in column):
-                    column = column.replace("=", "_eq_(")
+                    column = column.replace("=", " = (")
                     column = column+")"
                 else:
-                    column = column.replace("=", "_eq_")
+                    column = column.replace("=", " = ")
                     column = column
             columns.append(column)
+
         # print(self.columns)
 
         # make negated columns
-        num_features=len(columns)
-        for index in range(num_features):
-            columns.append("not_"+columns[index])
-        # print(self.columns)
+        # num_features=len(columns)
+        # for index in range(num_features):
+        #     columns.append("not "+columns[index])
     
 
         if(self.verbose):
@@ -119,13 +119,33 @@ class imli():
         print("\n\nIMLI:->")
         return '\n'.join(" - %s: %s" % (item, value) for (item, value) in vars(self).items() if "__" not in item)
 
-    def get_selected_column_index(self):
+    def _get_selected_column_index(self):
         return_list = [[] for i in range(self.numClause)]
         ySize = self.numFeatures
         for elem in self.__selectedFeatureIndex:
             new_index = int(elem)-1
+            
             return_list[int(new_index/ySize)].append(new_index % ySize)
         return return_list
+
+    def get_selected_column_index(self):
+        temp = self._get_selected_column_index()
+        result = []
+        for index_list in temp:
+            each_level_index = []
+            for index in index_list:
+                actual_feature_len = int(self.numFeatures/2)
+                if(self.ruleType == "DNF"):
+                    index = index - actual_feature_len if index >= actual_feature_len else index + actual_feature_len
+                if(index >= actual_feature_len):
+                    index = -1 * (index - actual_feature_len)
+                each_level_index.append(index)
+            result.append(each_level_index)
+        
+        return result
+                
+
+
 
     def get_num_of_iterations(self):
         return self.iterations
@@ -149,27 +169,29 @@ class imli():
         return self.solver
 
     def get_threshold_literal(self):
-        if(self.ruleType=="relaxed_CNF"):
-            return self.threshold_literal_learned
-        elif(self.ruleType=="CNF"):
-            return [1 for i in range(self.numClause)]
-        elif(self.ruleType=="DNF"):
-            return [len(selected_columns) for selected_columns in self.get_selected_column_index()]
-        else:
-            return
+        return self.threshold_literal_learned
+        # if(self.ruleType=="relaxed_CNF"):
+        #     return self.threshold_literal_learned
+        # elif(self.ruleType=="CNF"):
+        #     return [1 for i in range(self.numClause)]
+        # elif(self.ruleType=="DNF"):
+        #     return [len(selected_columns) for selected_columns in self.get_selected_column_index()]
+        # else:
+        #     return
 
     def get_threshold_clause(self):
-        if(self.ruleType=="relaxed_CNF"):
-            return self.threshold_clause_learned
-        elif(self.ruleType=="CNF"):
-            return self.numClause
-        elif(self.ruleType=="DNF"):
-            return 1
-        else:
-            return
+        return self.threshold_clause_learned
+        # if(self.ruleType=="relaxed_CNF"):
+        #     return self.threshold_clause_learned
+        # elif(self.ruleType=="CNF"):
+        #     return self.numClause
+        # elif(self.ruleType=="DNF"):
+        #     return 1
+        # else:
+        #     return
 
 
-    def discretize(self, file, categorical_column_index=[], column_seperator=",", frac_present=0.9, num_thresholds=4):
+    def _discretize(self, file, categorical_column_index=[], column_seperator=",", frac_present=0.9, num_thresholds=4):
 
         # Quantile probabilities
         quantProb = np.linspace(1. / (num_thresholds + 1.), num_thresholds / (num_thresholds + 1.), num_thresholds)
@@ -335,8 +357,19 @@ class imli():
             assert len(XTrain[0]) == len(XTrain_sampled[0])
 
             self.__call_cplex(XTrain_sampled, yTrain_sampled)
+    
+    def _transform_binary_matrix(self, X):
+        X = np.array(X)
+        assert np.array_equal(X, X.astype(bool)), "Feature array is not binary. Try imli.discretize or imli.discretize_orange"
+        X_complement = 1 - X
+        return np.hstack((X,X_complement))
+
 
     def fit(self, XTrain, yTrain):
+
+            
+        XTrain = self._transform_binary_matrix(XTrain)
+            
 
         if(self.ruleType!="CNF"  and self.ruleType!="DNF" and self.ruleType!="relaxed_CNF"):
             print("\n\nError rule type. Choices are [CNF, DNF, relaxed_CNF]")
@@ -365,49 +398,78 @@ class imli():
                 print("\nTraining started for batch: ", each_batch+1)
             self.__learnModel(XTrains[each_batch], yTrains[each_batch], isTest=False)
 
+        
+        # parameters learned for rule
+        if(self.ruleType=="CNF"):
+            self.threshold_literal_learned = [1 for i in range(self.numClause)]
+        elif(self.ruleType=="DNF"):
+            self.threshold_literal_learned = [len(selected_columns) for selected_columns in self._get_selected_column_index()]
+        else:
+            raise ValueError
+
+        if(self.ruleType=="CNF"):
+            self.threshold_clause_learned = self.numClause
+        elif(self.ruleType=="DNF"):
+            self.threshold_clause_learned = 1
+        else:
+            raise ValueError
+        
+
     def predict(self, XTest):
 
+        XTest = self._transform_binary_matrix(XTest)
+        assert self.numFeatures == XTest.shape[1]
         yTest = [1 for _ in XTest]
 
-        if(self.ruleType == "relaxed_CNF"):
-            y_hat = []
-            for i in range(len(yTest)):
-                dot_value = [0 for eachLevel in range(self.numClause)]
-                for j in range(len(XTest[i])):
-                    for eachLevel in range(self.numClause):
-                        dot_value[eachLevel] += XTest[i][j] * \
-                            self.__assignList[eachLevel * len(XTest[i]) + j]
-                if (yTest[i] == 1):
-                    correctClauseCount = 0
-                    for eachLevel in range(self.numClause):
-                        if (dot_value[eachLevel] >= self.threshold_literal_learned[eachLevel]):
-                            correctClauseCount += 1
-                    if (correctClauseCount >= self.threshold_clause_learned):
-                        y_hat.append(1)
-                    else:
-                        y_hat.append(0)
 
+        y_hat = []
+        for i in range(len(yTest)):
+            dot_value = [0 for eachLevel in range(self.numClause)]
+            for eachLevel in range(self.numClause):
+                if(self.ruleType == "relaxed_CNF"):
+                    dot_value[eachLevel] = np.dot(XTest[i], np.array(self.__assignList[eachLevel * self.numFeatures: (eachLevel + 1) * self.numFeatures ]))
+                elif(self.ruleType in ['CNF', 'DNF']):
+                    dot_value[eachLevel] = np.dot(XTest[i], self.__xhat[eachLevel])
                 else:
-                    correctClauseCount = 0
-                    for eachLevel in range(self.numClause):
-                        if (dot_value[eachLevel] < self.threshold_literal_learned[eachLevel]):
-                            correctClauseCount += 1
-                    if (correctClauseCount > self.numClause - self.threshold_clause_learned):
-                        y_hat.append(0)
-                    else:
-                        y_hat.append(1)
-            return y_hat
+                    raise ValueError
 
-        if(self.verbose):
-            print("\nPrediction through MaxSAT formulation")
-        predictions = self.__learnModel(XTest, yTest, isTest=True)
-        yhat = []
-        for i in range(len(predictions)):
-            if (int(predictions[i]) > 0):
-                yhat.append(1 - yTest[i])
+            if (yTest[i] == 1):
+                correctClauseCount = 0
+                for eachLevel in range(self.numClause):
+                    if (dot_value[eachLevel] >= self.threshold_literal_learned[eachLevel]):
+                        correctClauseCount += 1
+                if (correctClauseCount >= self.threshold_clause_learned):
+                    y_hat.append(1)
+                else:
+                    y_hat.append(0)
+
             else:
-                yhat.append(yTest[i])
-        return yhat
+                correctClauseCount = 0
+                for eachLevel in range(self.numClause):
+                    if (dot_value[eachLevel] < self.threshold_literal_learned[eachLevel]):
+                        correctClauseCount += 1
+                if (correctClauseCount > self.numClause - self.threshold_clause_learned):
+                    y_hat.append(0)
+                else:
+                    y_hat.append(1)
+
+        # in case of DNF, complement
+        if(self.ruleType == "DNF"):
+            return [1 - y for y in y_hat]
+        return y_hat
+
+        
+        
+        # if(self.verbose):
+        #     print("\nPrediction through MaxSAT formulation")
+        # predictions = self.__learnModel(XTest, yTest, isTest=True)
+        # yhat = []
+        # for i in range(len(predictions)):
+        #     if (int(predictions[i]) > 0):
+        #         yhat.append(1 - yTest[i])
+        #     else:
+        #         yhat.append(yTest[i])
+        # return yhat
 
     def _cmd_exists(self, cmd):
         return subprocess.call("type " + cmd, shell=True, 
@@ -470,8 +532,8 @@ class imli():
         TrueErrors = []
         zeroOneSolution = []
 
-        if(not self.__isEntropyBasedDiscretization and self._imli__columnInfo is not None):
-            fields = self.__pruneRules(fields, len(X[0]))
+        # if(not self.__isEntropyBasedDiscretization and self.__columnInfo is not None):
+        #     fields = self.__pruneRules(fields, len(X[0]))
 
         for field in fields:
             if (int(field) > 0):
@@ -712,6 +774,11 @@ class imli():
 
     def get_rule(self, features):
 
+        if(2 * len(features) == self.numFeatures):
+            features += ["not " + str(feature) for feature in features]
+            
+        assert len(features) == self.numFeatures
+
         if(self.ruleType == "relaxed_CNF"):  # naive copy paste
             no_features = len(features)
             # self.rule_size = 0
@@ -720,12 +787,7 @@ class imli():
 
                 for literal_index in range(no_features):
                     if (self.__assignList[eachLevel * no_features + literal_index] >= 1):
-                        # rule += "  X_" + str(literal_index + 1) + "  +"
-                        if(self.__isEntropyBasedDiscretization):
-                            rule += " " + features[literal_index] + "  +"
-                        else:
-                            rule += " " + ' '.join(features[literal_index]) + "  +"
-                        # self.rule_size += 1
+                        rule += " " + features[literal_index] + "  +"
                 rule = rule[:-1]
                 rule += ' )>= ' + str(self.threshold_literal_learned[eachLevel]) + "  ]"
 
@@ -733,47 +795,39 @@ class imli():
                     rule += ' +\n[ ( '
             rule += "  >= " + str(self.threshold_clause_learned)
 
-            if(self.__isEntropyBasedDiscretization):
-
-                rule = rule.replace('_l_', ' < ')
-                rule = rule.replace('_ge_', ' >= ')
-                rule = rule.replace('_eq_', ' = ')
 
             return rule
+        else:
 
-        generatedRule = '( '
-        for i in range(self.numClause):
-            xHatElem = self.__xhat[i]
-            inds_nnz = np.where(abs(xHatElem) > 1e-4)[0]
+            generatedRule = '( '
+            for i in range(self.numClause):
+                xHatElem = self.__xhat[i]
+                inds_nnz = np.where(abs(xHatElem) > 1e-4)[0]
 
-            if(self.__isEntropyBasedDiscretization or self._imli__columnInfo is None):
-                str_clauses = [''.join(features[ind]) for ind in inds_nnz]
-            else:
-                str_clauses = [' '.join(features[ind]) for ind in inds_nnz]
-            if (self.ruleType == "CNF"):
-                rule_sep = ' %s ' % "OR"
-            else:
-                rule_sep = ' %s ' % "AND"
-            rule_str = rule_sep.join(str_clauses)
-            if (self.ruleType == 'DNF'):
-                rule_str = rule_str.replace('<=', '??').replace('>', '<=').replace('??', '>')
-                rule_str = rule_str.replace('==', '??').replace('!=', '==').replace('??', '!=')
-                rule_str = rule_str.replace('is', '??').replace('is not', 'is').replace('??', 'is not')
+                # For DNF rule, we need to switch between two features. 
+                if(self.ruleType == "DNF"):
+                    actual_feature_len = int(self.numFeatures/2)
+                    inds_nnz = [index - actual_feature_len if index >= actual_feature_len else index + actual_feature_len for index in inds_nnz]
+                    
 
-            generatedRule += rule_str
-            if (i < self.numClause - 1):
-                if (self.ruleType == "DNF"):
-                    generatedRule += ' ) OR \n( '
-                if (self.ruleType == 'CNF'):
-                    generatedRule += ' ) AND \n( '
-        generatedRule += ')'
+                
+                str_clauses = [features[ind] for ind in inds_nnz]
+                
+                if (self.ruleType == "CNF"):
+                    rule_sep = ' %s ' % "OR"
+                else:
+                    rule_sep = ' %s ' % "AND"
+                rule_str = rule_sep.join(str_clauses)
+                
+                generatedRule += rule_str
+                if (i < self.numClause - 1):
+                    if (self.ruleType == "DNF"):
+                        generatedRule += ' ) OR \n( '
+                    if (self.ruleType == 'CNF'):
+                        generatedRule += ' ) AND \n( '
+            generatedRule += ')'
 
-        if(self.__isEntropyBasedDiscretization):
-            generatedRule = generatedRule.replace('_l_', ' < ')
-            generatedRule = generatedRule.replace('_ge_', ' >= ')
-            generatedRule = generatedRule.replace('_eq_', ' = ')
-
-        return generatedRule
+            return generatedRule
 
     def __generatSamples(self, XTrain, yTrain):
 
