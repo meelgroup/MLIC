@@ -36,7 +36,7 @@ To install the linear programming solver, i.e., CPLEX, download and install it f
 
 # Documentation
 
-See the documentation in the [notebook](documentation.ipynb).
+See the documentation in the [notebook](doc/documentation.ipynb).
 
 ## Issues, questions, bugs, etc.
 Please click on "issues" at the top and [create a new issue](https://github.com/meelgroup/MLIC/issues). All issues are responded to promptly.
