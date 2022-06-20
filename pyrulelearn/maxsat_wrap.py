@@ -344,7 +344,7 @@ def _learnModel(imli, X, y, isTest):
     if (not isTest):
         imli._assignList = fields[:imli.numClause * num_features]
         imli._selectedFeatureIndex = TrueRules
-
+        
         # print(imli._selectedFeatureIndex)
 
     

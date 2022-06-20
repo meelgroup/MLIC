@@ -1,8 +1,12 @@
 import Orange
 import numpy as np
+import pandas as pd
 import math
 from sklearn.model_selection import train_test_split
 import random
+from feature_engine import discretisers as dsc
+from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import MinMaxScaler
 
 
 
@@ -57,6 +61,161 @@ def discretize_orange(csv_file, verbose=False):
         print("- the number of discretized features:", len(columns))
 
     return np.array(X), np.array([int(value) for value in binarized_data.Y]),  columns
+
+
+
+def get_scaled_df(X):
+    # scale the feature values 
+    sc = StandardScaler()
+    X = sc.fit_transform(X)
+    return X
+
+
+
+def process(csv_file, verbose=False):
+    df = pd.read_csv(csv_file)
+    prev_columns = list(df.columns)
+
+    target = None
+    real_valued_columns = []
+    categorical_columns = []
+    
+    
+    for idx, column in enumerate(prev_columns):
+
+        if(column.startswith("i#")):
+            del df[column]
+            continue
+        
+
+
+        if(column.startswith("C#")):
+            column = column[2:]
+            real_valued_columns.append(column)
+        elif(column.startswith("D#")):
+            column = column[2:]
+            categorical_columns.append(column)
+        elif(column.startswith("cD#")):
+            column = column[3:]
+            target = column
+        else:
+            raise ValueError(str(column) + " is not recognized")
+        
+        df.rename({prev_columns[idx] : column}, axis=1, inplace=True)
+
+    assert len([target] + categorical_columns + real_valued_columns) == len(df.columns)
+
+    # scale 
+    scaler = MinMaxScaler()
+    if(len(real_valued_columns) > 0):
+        df[real_valued_columns] = scaler.fit_transform(df[real_valued_columns])
+
+
+    # drop rows with null values
+    df = df.dropna()
+
+    X_orig = df.drop([target], axis=1)
+    y_orig = df[target]
+
+    X = get_one_hot_encoded_df(X_orig, columns_to_one_hot=categorical_columns)
+
+    
+    X_discretized, binner_dict = get_discretized_df(X_orig, columns_to_discretize=real_valued_columns, verbose=False)
+    # print(binner_dict)
+    X_discretized = get_one_hot_encoded_df(X_discretized, columns_to_one_hot=list(X_discretized.columns), good_name=binner_dict)
+
+
+    return X.values, y_orig.values, list(X.columns), X_discretized.values, y_orig.values, list(X_discretized.columns)
+
+    
+
+
+
+def get_discretized_df(data, columns_to_discretize = None, verbose=False):
+    """ 
+    returns train_test_splitted and discretized df
+    """
+
+    binner_dict_ = {}
+    
+    if(columns_to_discretize is None):
+        columns_to_discretize = list(data.columns)
+
+    if(verbose):
+        print("Applying discretization\nAttribute bins")
+    for variable in columns_to_discretize:
+        bins = min(10, len(data[variable].unique()))
+        if(verbose):
+            print(variable, bins)
+            
+        # set up the discretisation transformer
+        disc  = dsc.EqualWidthDiscretiser(bins=bins, variables = [variable])
+        
+        # fit the transformer
+        disc.fit(data)
+
+        if(verbose):
+            print(disc.binner_dict_)
+
+        for key in disc.binner_dict_:
+            assert key not in binner_dict_
+            binner_dict_[key] = disc.binner_dict_[key]
+
+        # transform the data
+        data = disc.transform(data)
+        if(verbose):
+            print(data[variable].unique())
+        
+        
+    return data, binner_dict_
+
+
+def get_one_hot_encoded_df(df, columns_to_one_hot, good_name = {}, verbose = False):
+    """  
+    Apply one-hot encoding on categircal df and return the df
+    """
+    if(verbose):
+        print("\n\nApply one-hot encoding on categircal attributes")
+    for column in columns_to_one_hot:
+        if(column not in df.columns):
+            if(verbose):
+                print(column, " is not considered in classification")
+            continue 
+
+        # Apply when there are more than two categories or the binary categories are string objects.
+        unique_categories = df[column].unique()
+        if(len(unique_categories) > 2):
+            one_hot = pd.get_dummies(df[column])
+            if(verbose):
+                print(column, " has more than two unique categories", list(one_hot.columns))
+
+            if(len(one_hot.columns)>1):
+                if(column not in good_name):
+                    one_hot.columns = [column + " = " + str(c) for c in one_hot.columns]
+                else:
+                    # print(column, one_hot.columns)
+                    one_hot.columns = [str(good_name[column][idx]) + " <= " + column + " < "  +  str(good_name[column][idx + 1]) for idx in one_hot.columns]
+            else:
+                one_hot.columns = [column for c in one_hot.columns]
+            df = df.drop(column,axis = 1)
+            df = df.join(one_hot)
+        else:
+            # print(column, unique_categories)
+            if(0 in unique_categories and 1 in unique_categories):
+                if(verbose):
+                    print(column, " has categories 1 and 0")
+
+                continue
+            if(len(unique_categories) == 2):
+                df[column] = df[column].map({unique_categories[0]: 0, unique_categories[1]: 1})
+            else:
+                assert len(unique_categories) == 1
+                df[column] = df[column].map({unique_categories[0]: 0})
+            if(verbose):
+                print("Applying following mapping on attribute", column, "=>", unique_categories[0], ":",  0, "|", unique_categories[1], ":", 1)
+    if(verbose):
+        print("\n")
+    return df
 
 
 

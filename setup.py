@@ -10,7 +10,7 @@ with open(path.join(this_directory, 'README.md'), encoding='utf-8') as f:
 setup(
   name = 'pyrulelearn',
   packages = ['pyrulelearn'],
-  version = 'v1.1.0',
+  version = 'v1.1.1',
   license='MIT',
   description = 'This library can be used to generate interpretable classification rules expressed as CNF/DNF and relaxed-CNF',
   long_description=long_description,
@@ -18,7 +18,7 @@ setup(
   author = 'Bishwamittra Ghosh',
   author_email = 'bishwamittra.ghosh@gmail.com',
   url = 'https://github.com/meelgroup/MLIC',
-  download_url = 'https://github.com/meelgroup/MLIC/archive/v1.1.0.tar.gz',
+  download_url = 'https://github.com/meelgroup/MLIC/archive/v1.1.1.tar.gz',
   keywords = ['Classification Rules', 'Interpretable Rules', 'CNF Classification Rules', 'DNF Classification Rules','MaxSAT-based Rule Learning'],   # Keywords that define your package best
   classifiers=[
     'Development Status :: 3 - Alpha',

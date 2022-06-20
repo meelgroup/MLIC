@@ -41,7 +41,7 @@ class imli():
         --- more are added later
 
         '''
-
+    
         # assert 0 <= batchsize and batchsize <= 1
         assert isinstance(batchsize, int)
         assert isinstance(data_fidelity, int)
@@ -338,6 +338,7 @@ class imli():
         self.numClause = 1
         self.clause_target = []
         xhat_computed = []
+        selectedFeatureIndex_computed = []
         verbose = self.verbose
         self.verbose = False
 
@@ -351,6 +352,8 @@ class imli():
             
             # Trivial termination when there is no sample to classify
             if(len(yTrain) == 0):
+                if(verbose):
+                    print("\nTerminating because training set is empty\n")
                 break
 
             yTrain_orig = yTrain.copy()
@@ -462,14 +465,8 @@ class imli():
                     
 
             self._learn_parameter()
-
-            # If learned rule is empty, it can be discarded
-            if(self._xhat[0].sum() == 0):
-                if(len(self.clause_target) > 0):
-                    self.clause_target = self.clause_target[:-1]
-                break
-            else:
-                xhat_computed.append(self._xhat[0])
+            
+            
 
             yhat = self.predict(XTrain)
             
@@ -495,9 +492,29 @@ class imli():
                 print("Coverage:", len(yTrain_orig[~mask]) , "samples")
                 print("Of which, positive samples in original:", yTrain_orig[~mask].sum())
             
-            # If no sample is removed, next iteration will generate same hypothesi, hence the process is terminated
-            if(len(yTrain_orig[~mask]) == 0):
+            
+
+            # If learned rule is empty, it can be discarded
+            if(self._xhat[0].sum() == 0 or any(np.array_equal(np.array(x), self._xhat[0]) for x in xhat_computed)):
+                if(len(self.clause_target) > 0):
+                    self.clause_target = self.clause_target[:-1]
+                if(verbose):
+                    print("Terminating becuase current rule is empty or repeated")
                 break
+            # If no sample is removed, next iteration will generate same hypothesis, hence the process is terminated
+            elif(len(yTrain_orig[~mask]) == 0):
+                if(len(self.clause_target) > 0):
+                    self.clause_target = self.clause_target[:-1]
+                if(verbose):
+                    print("Terminating becuase no new sample is removed by current rule")
+                break
+            else:
+                xhat_computed.append(self._xhat[0])
+                selectedFeatureIndex_computed += [val + idx * self.numFeatures for val in self._selectedFeatureIndex]
+
+
+
+            
 
         
         
@@ -518,6 +535,7 @@ class imli():
         # Get back to initial values
         self.numClause = len(self.clause_target)
         self._xhat = xhat_computed
+        self._selectedFeatureIndex = selectedFeatureIndex_computed
         self.ruleType = ruleType_orig
         self.verbose = verbose
 
@@ -558,6 +576,13 @@ class imli():
 
             
             # yTrain_orig = yTrain.copy()
+
+            # Trivial termination when there is no sample to classify
+            if(len(yTrain) == 0):
+                if(verbose):
+                    print("\nTerminating because training set is empty\n")
+                break
+
             
             if(verbose):
                 print("\n\n\n")
@@ -646,16 +671,7 @@ class imli():
                     
 
             
-            # If learned rule is empty, it can be discarded
-            if(self._xhat[0].sum() == 0):
-                if(verbose):
-                    print("Terminating becuase current rule is empty")
-                break
-            else:
-                # TODO reorder self_xhat
-                xhat_computed.append(self._xhat[0])
-                selectedFeatureIndex_computed += [val + idx * self.numFeatures for val in self._selectedFeatureIndex]
-
+            
             # print(classification_report(yTrain, yhat, target_names=np.unique(yTrain).astype("str")))
             # print(accuracy_score(yTrain, yhat))
             
@@ -677,6 +693,20 @@ class imli():
                 print("Coverage:", len(yTrain[~mask]) , "samples")
 
             
+            
+
+            # If learned rule is empty, it can be discarded, except this is the first clause
+            if(self._xhat[0].sum() == 0 and len(xhat_computed) != 0):
+                if(verbose):
+                    print(len(xhat_computed))
+                    print("Terminating becuase current rule is empty")
+                break
+            else:
+                # TODO reorder self_xhat
+                xhat_computed.append(self._xhat[0])
+                selectedFeatureIndex_computed += [val + idx * self.numFeatures for val in self._selectedFeatureIndex]
+
+
             # If no sample is removed, next iteration will generate the same hypothesis, hence the process is terminated
             if(len(yTrain[~mask])  == 0):
                 if(verbose):
@@ -685,7 +715,6 @@ class imli():
 
             XTrain = XTrain[mask]
             yTrain = yTrain[mask]
-
 
         
         
@@ -724,6 +753,7 @@ class imli():
         self.numClause = 1
         self.clause_target = []
         xhat_computed = []
+        selectedFeatureIndex_computed = []
         verbose = self.verbose
         self.verbose = False
         
@@ -732,6 +762,11 @@ class imli():
         for idx in range(k):
             self._fit_start_time = time()
                 
+            # Trivial termination when there is no sample to classify
+            if(len(yTrain) == 0):
+                if(verbose):
+                    print("\nTerminating because training set is empty\n")
+                break
 
             
             yTrain_orig = yTrain.copy()
@@ -825,16 +860,8 @@ class imli():
                     
 
             
-            # If learned rule is empty, it can be discarded
-            if(self._xhat[0].sum() == 0):
-                if(len(self.clause_target) > 0):
-                    self.clause_target = self.clause_target[:-1]
-                if(verbose):
-                    print("Terminating becuase current rule is empty")
-                break
-            else:
-                # TODO reorder self_xhat
-                xhat_computed.append(self._xhat[0])
+            
+            
 
             # print(classification_report(yTrain, yhat, target_names=np.unique(yTrain).astype("str")))
             # print(accuracy_score(yTrain, yhat))
@@ -853,13 +880,25 @@ class imli():
             if(verbose):    
                 print("Coverage:", len(yTrain_orig[~mask]) , "samples")
             
-            # If no sample is removed, next iteration will generate the same hypothesis, hence the process is terminated
-            if(len(yTrain_orig[~mask])  == 0):
+            # If learned rule is empty, it can be discarded
+            if(self._xhat[0].sum() == 0 or any(np.array_equal(np.array(x), self._xhat[0]) for x in xhat_computed)):
+                if(len(self.clause_target) > 0):
+                    self.clause_target = self.clause_target[:-1]
+                if(verbose):
+                    print("Terminating becuase current rule is empty or repeated")
+                break
+            # If no sample is removed, next iteration will generate same hypothesis, hence the process is terminated
+            elif(len(yTrain_orig[~mask]) == 0):
+                if(len(self.clause_target) > 0):
+                    self.clause_target = self.clause_target[:-1]
                 if(verbose):
                     print("Terminating becuase no new sample is removed by current rule")
                 break
+            else:
+                xhat_computed.append(self._xhat[0])
+                selectedFeatureIndex_computed += [val + idx * self.numFeatures for val in self._selectedFeatureIndex]
 
-        
+            
         
         """
         Default rule
@@ -880,6 +919,7 @@ class imli():
         self._xhat = xhat_computed
         self.ruleType = ruleType_orig
         self.verbose = verbose
+        self._selectedFeatureIndex = selectedFeatureIndex_computed
 
 
         # parameters learned for rule
@@ -931,7 +971,7 @@ class imli():
             self._fit_mode = False
             return
 
-
+        
         if(recursive):
             self._fit_CNF_DNF_recursive(XTrain, yTrain)
             self._fit_mode = False
@@ -943,6 +983,7 @@ class imli():
 
 
         self.iterations = 2**math.floor(math.log2(XTrain.shape[0]/self.batchsize))
+        
         
         best_loss = self.dataFidelity * XTrain.shape[0] + self.numFeatures * self.weightFeature * self.numClause
         best_loss_attribute = None
