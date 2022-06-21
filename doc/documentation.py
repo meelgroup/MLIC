@@ -15,7 +15,7 @@
 
 
 import sys
-sys.path.append("../")
+# sys.path.append("../")
 
 from pyrulelearn.imli import imli
 from pyrulelearn import utils
