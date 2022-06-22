@@ -42,7 +42,7 @@ matplotlib-inline==0.1.3
 msgpack==1.0.4
 nest-asyncio==1.5.5
 networkx==2.6.3
-numpy==1.21.6
+numpy==1.22.0
 openpyxl==3.0.10
 openTSNE==0.6.2
 orange-canvas-core==0.1.26
