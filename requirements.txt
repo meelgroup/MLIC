@@ -30,7 +30,7 @@ ipykernel==6.15.0
 ipython==7.34.0
 ipython-genutils==0.2.0
 jedi==0.18.1
-joblib==1.1.0
+joblib==1.2.0
 jupyter-client==7.3.4
 jupyter-core==4.10.0
 keyring==23.6.0
